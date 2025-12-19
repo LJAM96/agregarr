@@ -167,6 +167,32 @@ const customUrlValidations = {
         ),
     otherwise: (schema) => schema,
   }),
+
+  mdblistCustomListUrl: Yup.string()
+    .when(['type', 'subtype'], {
+      is: (type: string, subtype: string) =>
+        type === 'mdblist' && subtype === 'custom',
+      then: (schema) =>
+        schema
+          .required('MDBList list URL is required')
+          .matches(
+            /mdblist\.com\/(lists\/[^/]+\/[^/?]+|lists\/(?:external\/)?\d+)/,
+            'Please enter a valid MDBList list URL (e.g., lists/username/listname or lists/id)'
+          ),
+      otherwise: (schema) => schema,
+    })
+    .when(['type', 'subtype'], {
+      is: (type: string, subtype: string) =>
+        type === 'mdblist' && subtype === 'search',
+      then: (schema) =>
+        schema
+          .required('MDBList search URL is required')
+          .matches(
+            /mdblist\.com\/(shows|movies)/,
+            'Please enter a valid MDBList search URL'
+          ),
+      otherwise: (schema) => schema,
+    }),
 };
 
 // Auto-request validation
@@ -390,7 +416,11 @@ export const ValidationHelpers = {
    * Validate custom URL based on collection type and subtype
    */
   validateCustomUrl: (values: CollectionFormConfig): string | null => {
-    if (!values.type || values.subtype !== 'custom') {
+    if (
+      !values.type ||
+      (values.subtype !== 'custom' &&
+        !(values.type === 'mdblist' && values.subtype === 'search'))
+    ) {
       return null; // No custom URL required
     }
 
@@ -401,6 +431,7 @@ export const ValidationHelpers = {
       letterboxd: 'letterboxdCustomListUrl',
       anilist: 'anilistCustomListUrl',
       myanimelist: 'myanilistCustomListUrl',
+      mdblist: 'mdblistCustomListUrl',
     };
 
     const urlField = urlFieldMap[values.type];

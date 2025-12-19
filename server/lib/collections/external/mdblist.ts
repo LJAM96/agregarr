@@ -221,10 +221,10 @@ export class MDBListCollectionSync extends BaseCollectionSync<'mdblist'> {
     const mediaType = getCollectionMediaType(config);
 
     try {
-      if (listType !== 'custom') {
+      if (listType !== 'custom' && listType !== 'search') {
         throw this.createSyncError(
           CollectionSyncErrorType.CONFIGURATION_ERROR,
-          `MDBList only supports custom lists. Invalid subtype: ${config.subtype}`
+          `MDBList only supports custom and search lists. Invalid subtype: ${config.subtype}`
         );
       }
 
@@ -235,23 +235,62 @@ export class MDBListCollectionSync extends BaseCollectionSync<'mdblist'> {
         );
       }
 
-      // Strip query parameters from URL before calling MDBList API
+      // Strip query parameters from URL ONLY for standard custom lists
+      // Search lists require query parameters
       const cleanUrl =
-        config.mdblistCustomListUrl?.split('?')[0] ||
-        config.mdblistCustomListUrl;
+        config.subtype === 'search'
+          ? config.mdblistCustomListUrl
+          : config.mdblistCustomListUrl?.split('?')[0] ||
+            config.mdblistCustomListUrl;
 
-      const customListData: MDBListResponse = await mdblistClient.getCustomList(
-        cleanUrl,
-        {
-          limit: 9999,
+      const limit = 1000;
+      let offset = 0;
+      let hasMore = true;
+      let pageCount = 0;
+
+      while (hasMore) {
+        pageCount++;
+        logger.debug(
+          `Fetching MDBList page ${pageCount} (offset: ${offset}, limit: ${limit})`,
+          {
+            label: 'MDBList Collections',
+          }
+        );
+
+        const customListData: MDBListResponse =
+          await mdblistClient.getCustomList(cleanUrl, {
+            limit,
+            offset,
+          });
+
+        const movieCount = customListData.movies?.length || 0;
+        const showCount = customListData.shows?.length || 0;
+        const totalFetched = movieCount + showCount;
+
+        // Convert to standardized format
+        const targetItems: (MDBListMovie | MDBListShow)[] =
+          mediaType === 'movie' ? customListData.movies : customListData.shows;
+
+        if (targetItems && targetItems.length > 0) {
+          mdblistData.push(...targetItems.map((item) => ({ item, mediaType })));
         }
-      );
 
-      // Convert to standardized format
-      const targetItems: (MDBListMovie | MDBListShow)[] =
-        mediaType === 'movie' ? customListData.movies : customListData.shows;
+        // Check if we reached the end
+        // If we fetched fewer items than the limit, we're done
+        if (totalFetched < limit) {
+          hasMore = false;
+        } else {
+          offset += limit;
+        }
 
-      mdblistData.push(...targetItems.map((item) => ({ item, mediaType })));
+        // Safety break to prevent infinite loops in case of API weirdness
+        if (pageCount > 100) {
+          logger.warn('MDBList pagination forced break after 100 pages', {
+            label: 'MDBList Collections',
+          });
+          break;
+        }
+      }
 
       return mdblistData;
     } catch (error) {
@@ -283,6 +322,7 @@ export class MDBListCollectionSync extends BaseCollectionSync<'mdblist'> {
     // Extract all TMDB IDs and prepare lookup data
     const mdblistLookups: {
       tmdbId: number;
+      imdbId?: string;
       mediaType: 'movie' | 'tv';
       title: string;
       year?: number;
@@ -292,10 +332,11 @@ export class MDBListCollectionSync extends BaseCollectionSync<'mdblist'> {
     for (let index = 0; index < sourceData.length; index++) {
       const sourceItem = sourceData[index];
       try {
-        // MDBList items have id (which is TMDB ID), title, and mediatype
+        // MDBList items have id (TMDB ID), imdb_id, title, and mediatype
         const item = sourceItem.item;
 
-        if (!item.id) {
+        // Skip only if we have neither TMDB ID nor IMDB ID
+        if (!item.id && !item.imdb_id) {
           continue;
         }
 
@@ -304,6 +345,7 @@ export class MDBListCollectionSync extends BaseCollectionSync<'mdblist'> {
 
         mdblistLookups.push({
           tmdbId: item.id,
+          imdbId: item.imdb_id || undefined,
           mediaType: itemMediaType as 'movie' | 'tv',
           title: item.title,
           year: item.release_year,
@@ -359,11 +401,61 @@ export class MDBListCollectionSync extends BaseCollectionSync<'mdblist'> {
       });
     }
 
+    // Build IMDB lookup map from libraryCache for items with tmdbId=0
+    const imdbLookup: Map<
+      string,
+      { ratingKey: string; title: string; libraryKey: string }
+    > = new Map();
+
+    if (libraryCache) {
+      const targetLibraryId = Array.isArray(config.libraryId)
+        ? config.libraryId[0]
+        : config.libraryId;
+
+      // Build IMDB lookup from cached library items
+      for (const [libraryKey, items] of Object.entries(libraryCache)) {
+        // Only check target library for collection creation
+        if (targetLibraryId && libraryKey !== targetLibraryId) {
+          continue;
+        }
+
+        for (const item of items) {
+          if (item.Guid) {
+            for (const guid of item.Guid) {
+              // Match IMDB GUIDs like "imdb://tt1234567"
+              const imdbMatch = guid.id?.match(/imdb:\/\/(tt\d+)/);
+              if (imdbMatch) {
+                imdbLookup.set(imdbMatch[1], {
+                  ratingKey: item.ratingKey,
+                  title: item.title,
+                  libraryKey,
+                });
+              }
+            }
+          }
+        }
+      }
+      logger.debug(`Built IMDB lookup map with ${imdbLookup.size} entries`, {
+        label: 'MDBList Collections',
+      });
+    }
+
     // Process items using the Plex lookup map
     for (const lookup of mdblistLookups) {
-      const key = `${lookup.tmdbId}-${lookup.mediaType}`;
+      let plexItem:
+        | { ratingKey: string; title: string; libraryKey: string }
+        | undefined;
 
-      const plexItem = plexLookup.get(key);
+      // First try TMDB lookup (for items with valid TMDB ID)
+      if (lookup.tmdbId > 0) {
+        const key = `${lookup.tmdbId}-${lookup.mediaType}`;
+        plexItem = plexLookup.get(key);
+      }
+
+      // Fallback to IMDB lookup for items with tmdbId=0
+      if (!plexItem && lookup.imdbId) {
+        plexItem = imdbLookup.get(lookup.imdbId);
+      }
 
       if (plexItem) {
         const mappedItem = {
@@ -468,15 +560,16 @@ export class MDBListCollectionSync extends BaseCollectionSync<'mdblist'> {
       return false;
     }
 
-    // Only custom lists are supported
-    return config.subtype === 'custom';
+    // Custom and Search lists are supported
+    return config.subtype === 'custom' || config.subtype === 'search';
   }
 
   private getListTypeFromSubtype(subtype: string | undefined): string {
     if (!subtype) return 'custom';
 
-    // Only custom lists are supported
-    return subtype === 'custom' ? 'custom' : 'custom';
+    if (subtype === 'search') return 'search';
+
+    return 'custom';
   }
 
   private async handleAutoRequests(

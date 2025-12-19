@@ -204,6 +204,11 @@ const CollectionTypeSection = ({
             label: 'Custom List',
             description: 'Import a custom MDBList by URL',
           },
+          {
+            value: 'search',
+            label: 'Search List',
+            description: 'Import a search result page by URL',
+          },
         ];
       case 'tmdb':
         return [

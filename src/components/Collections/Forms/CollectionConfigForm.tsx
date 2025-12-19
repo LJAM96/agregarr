@@ -503,6 +503,13 @@ const CollectionFormConfigForm = ({
         }),
     }),
 
+    mdblistCustomListUrl: Yup.string().when(['type', 'subtype'], {
+      is: (type: string, subtype: string) =>
+        type === 'mdblist' && (subtype === 'custom' || subtype === 'search'),
+      then: (schema) => schema.required('MDBList list URL is required'),
+      otherwise: (schema) => schema,
+    }),
+
     anilistCustomListUrl: Yup.string().when(['type', 'subtype'], {
       is: (type: string, subtype: string) =>
         type === 'anilist' && subtype === 'custom',
@@ -928,7 +935,13 @@ const CollectionFormConfigForm = ({
         }
       }
     } catch (error) {
-      // Failed to fetch MDBList title - silently continue
+      console.error('MDBList fetch error:', error);
+      addToast(
+        error instanceof Error
+          ? error.message
+          : 'Failed to fetch MDBList title',
+        { appearance: 'error', autoDismiss: true }
+      );
     } finally {
       setFetchingTitle((prev) => ({ ...prev, mdblist: false }));
     }
@@ -1890,7 +1903,7 @@ const CollectionFormConfigForm = ({
                                 ].includes(values.subtype) ||
                                 values.timePeriod) &&
                               // For custom types, show after title is fetched OR when editing existing config with a name
-                              (values.subtype !== 'custom' ||
+                              (!['custom', 'search'].includes(values.subtype) ||
                                 (values.type === 'trakt' &&
                                   values.subtype === 'custom' &&
                                   (fetchedTitles.trakt || config?.name)) ||
@@ -1904,7 +1917,9 @@ const CollectionFormConfigForm = ({
                                   values.subtype === 'custom' &&
                                   (fetchedTitles.letterboxd || config?.name)) ||
                                 (values.type === 'mdblist' &&
-                                  values.subtype === 'custom' &&
+                                  ['custom', 'search'].includes(
+                                    values.subtype
+                                  ) &&
                                   (fetchedTitles.mdblist || config?.name)) ||
                                 (values.type === 'anilist' &&
                                   values.subtype === 'custom' &&

@@ -132,13 +132,26 @@ export function validateExternalUrl(
         }
         break;
       case 'mdblist':
-        if (!urlObj.pathname.match(/^\/lists\/[^/]+\/[^/?]+\/?$/)) {
+        if (
+          !urlObj.pathname.match(/^\/lists\/[^/]+\/[^/?]+\/?$/) && // User lists
+          !urlObj.pathname.match(/^\/lists\/(?:external\/)?\d+\/?$/) && // ID lists & External lists
+          !urlObj.pathname.match(/^\/(shows|movies)\/?$/) // Search pages (query params validated by URL object)
+        ) {
+          logger.debug('MDBList URL validation failed', {
+            label: 'Collections',
+            pathname: urlObj.pathname,
+            url: urlObj.toString(),
+          });
           return {
             isValid: false,
             error:
               'Invalid MDBList list URL format. Expected: https://mdblist.com/lists/username/listname',
           };
         }
+        logger.debug('MDBList URL validation passed', {
+          label: 'Collections',
+          pathname: urlObj.pathname,
+        });
         break;
       case 'letterboxd':
         if (

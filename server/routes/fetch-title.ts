@@ -36,6 +36,16 @@ fetchTitleRoutes.post('/', isAuthenticated(), async (req, res) => {
 
     // Validate and sanitize the URL
     const validation = validateExternalUrl(url, type);
+
+    logger.debug('Validation result for URL', {
+      label: 'Collections API',
+      url,
+      type,
+      isValid: validation.isValid,
+      error: validation.error,
+      sanitizedUrl: validation.sanitizedUrl,
+    });
+
     if (!validation.isValid) {
       return res.status(400).json({
         status: 'error',
@@ -234,7 +244,7 @@ fetchTitleRoutes.post('/', isAuthenticated(), async (req, res) => {
               .replace(/&mdash;/g, '—') // Replace em-dash
               .replace(/&hellip;/g, '…') // Replace ellipsis
               .replace(/&quot;/g, '"') // Replace quotes
-              .replace(/&#0?39;/g, "'") // Replace apostrophe (with or without leading zero)
+              .replace(/&#39;/g, "'") // Replace apostrophe
               .replace(/&#x27;/g, "'") // Replace hex-encoded apostrophe
               .replace(/&amp;/g, '&') // Replace ampersand (do this last)
               .replace(/&lt;/g, '<')
@@ -401,8 +411,7 @@ fetchTitleRoutes.post('/', isAuthenticated(), async (req, res) => {
                 .replace(/&mdash;/g, '—') // Replace em-dash
                 .replace(/&hellip;/g, '…') // Replace ellipsis
                 .replace(/&quot;/g, '"') // Replace quotes
-                .replace(/&#0?39;/g, "'") // Replace apostrophe (with or without leading zero)
-                .replace(/&#x27;/g, "'") // Replace hex-encoded apostrophe
+                .replace(/&#39;/g, "'") // Replace apostrophe
                 .replace(/&amp;/g, '&') // Replace ampersand (do this last)
                 .replace(/&lt;/g, '<')
                 .replace(/&gt;/g, '>');
@@ -586,6 +595,35 @@ fetchTitleRoutes.post('/', isAuthenticated(), async (req, res) => {
           status: 'error',
           message: 'Unsupported collection type',
         });
+    }
+
+    if (!title && type === 'mdblist') {
+      // Fallback for MDBList search URLs if title wasn't set above
+      const apiKey = getSettings().mdblist.apiKey;
+
+      if (apiKey) {
+        const MDBListAPI = (await import('@server/api/mdblist')).default;
+        const mdblistClient = new MDBListAPI(apiKey);
+        const parsedUrl = mdblistClient.parseListUrl(sanitizedUrl);
+
+        if (parsedUrl?.type === 'search') {
+          title = 'MDBList Search Results';
+          // valid search url, try to be more specific if possible
+          if (parsedUrl.searchUrl) {
+            try {
+              const urlObj = new URL(parsedUrl.searchUrl);
+              const query =
+                urlObj.searchParams.get('q') ||
+                urlObj.searchParams.get('q_title');
+              if (query) {
+                title = `MDBList Search: ${query}`;
+              }
+            } catch (e) {
+              // ignore
+            }
+          }
+        }
+      }
     }
 
     if (!title) {

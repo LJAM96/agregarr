@@ -544,10 +544,20 @@ export const useFormBehavior = ({
 
         case 'customUrls':
           return Boolean(
-            isRegularForm && values.type && values.subtype === 'custom'
+            isRegularForm &&
+              values.type &&
+              (values.subtype === 'custom' || values.subtype === 'search')
           );
 
         case 'librarySelection':
+          // For MDBList search lists, only show after validation (when template is set)
+          if (values.type === 'mdblist' && values.subtype === 'search') {
+            return Boolean(
+              values.template &&
+                values.template !== 'fetch-title' &&
+                values.template !== 'custom'
+            );
+          }
           return Boolean(values.type && values.subtype);
 
         case 'template':

@@ -514,7 +514,8 @@ export type TraktSourceData =
 
 export interface MDBListSourceData {
   item: {
-    id: number; // TMDB ID
+    id: number; // TMDB ID (0 for scraped search items)
+    imdb_id?: string; // IMDB ID (used for scraped search items)
     title: string;
     mediatype: 'movie' | 'show';
     rank?: number;

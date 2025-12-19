@@ -89,12 +89,13 @@ export const getTemplatePresets = (
       | 'imdb'
       | 'letterboxd'
       | 'mdblist'
-      | 'anilist'
+      | 'anilist',
+    defaultLabel = 'Validate URL'
   ): TemplatePreset[] => {
     if (!title) {
       return [
         {
-          label: 'Validate URL',
+          label: defaultLabel,
           value: 'fetch-title',
         },
         { label: 'Custom', value: 'custom' },
@@ -865,7 +866,12 @@ export const getTemplatePresets = (
           { label: 'Custom', value: 'custom' },
         ];
       case 'custom':
-        return getCustomUrlPresets(fetchedTitles?.mdblist || '', 'mdblist');
+      case 'search':
+        return getCustomUrlPresets(
+          fetchedTitles?.mdblist || '',
+          'mdblist',
+          'Custom MDBList Search'
+        );
       default:
         return [{ label: 'Custom', value: 'custom' }];
     }
