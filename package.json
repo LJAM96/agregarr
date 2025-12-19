@@ -249,10 +249,7 @@
         "buildArgs": {
           "COMMIT_TAG": "$GIT_SHA"
         },
-        "imageNames": [
-          "agregarr/agregarr",
-          "ghcr.io/agregarr/agregarr"
-        ],
+        "imageNames": ["ghcr.io/ljam96/agregarr"],
         "platforms": [
           "linux/amd64",
           "linux/arm64"
