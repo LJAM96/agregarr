@@ -1,3 +1,10 @@
+## [2.0.3](https://github.com/LJAM96/agregarr/compare/v2.0.2...v2.0.3) (2025-12-20)
+
+
+### Bug Fixes
+
+* **ci:** revert to QEMU with caching (ARM64 runners not available) ([90fc58b](https://github.com/LJAM96/agregarr/commit/90fc58b401f1f4f0f6ab231d576613de4d77d002))
+
 ## [2.0.2](https://github.com/LJAM96/agregarr/compare/v2.0.1...v2.0.2) (2025-12-20)
 
 
