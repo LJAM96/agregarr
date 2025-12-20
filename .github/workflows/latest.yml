@@ -34,9 +34,18 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          npx semantic-release
-          echo "new_release_published=$(cat .release-status 2>/dev/null || echo false)" >> $GITHUB_OUTPUT
-          echo "new_release_version=$(cat .release-version 2>/dev/null || echo '')" >> $GITHUB_OUTPUT
+          npx semantic-release > release-output.txt 2>&1 || true
+          if grep -q "Published release" release-output.txt; then
+            VERSION=$(grep "Published release" release-output.txt | sed -n 's/.*Published release \([0-9.]*\).*/\1/p')
+            echo "new_release_published=true" >> $GITHUB_OUTPUT
+            echo "new_release_version=$VERSION" >> $GITHUB_OUTPUT
+            echo "✅ New release published: v$VERSION"
+          else
+            echo "new_release_published=false" >> $GITHUB_OUTPUT
+            echo "new_release_version=" >> $GITHUB_OUTPUT
+            echo "ℹ️ No new release published"
+          fi
+          cat release-output.txt
 
   build_and_push:
     name: Build & Publish Docker Images
