@@ -58,7 +58,7 @@ jobs:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Extract metadata
+      - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
         with:
@@ -110,18 +110,21 @@ jobs:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Extract metadata
+      - name: Convert repository name to lowercase
+        id: repo
+        run: echo "repository=${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT
+      - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository }}
+          images: ghcr.io/${{ steps.repo.outputs.repository }}
           tags: |
             type=raw,value=develop
       - name: Create manifest list and push
         working-directory: /tmp/digests
         run: |
           docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf 'ghcr.io/${{ github.repository }}@sha256:%s ' *)
+            $(printf 'ghcr.io/${{ steps.repo.outputs.repository }}@sha256:%s ' *)
       - name: Inspect image
         run: |
-          docker buildx imagetools inspect ghcr.io/${{ github.repository }}:develop
+          docker buildx imagetools inspect ghcr.io/${{ steps.repo.outputs.repository }}:develop
