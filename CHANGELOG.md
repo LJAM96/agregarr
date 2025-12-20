@@ -1,3 +1,10 @@
+# [2.1.0](https://github.com/LJAM96/agregarr/compare/v2.0.3...v2.1.0) (2025-12-20)
+
+
+### Features
+
+* **ci:** use self-hosted ARM64 runner for latest builds ([ccfd76a](https://github.com/LJAM96/agregarr/commit/ccfd76a3c2495979b8e6d3592d6e75f08ebc5279))
+
 ## [2.0.3](https://github.com/LJAM96/agregarr/compare/v2.0.2...v2.0.3) (2025-12-20)
 
 
