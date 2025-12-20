@@ -1,3 +1,10 @@
+## [2.0.1](https://github.com/LJAM96/agregarr/compare/v2.0.0...v2.0.1) (2025-12-20)
+
+
+### Bug Fixes
+
+* **ci:** convert repository name to lowercase for Docker registry ([7c3478c](https://github.com/LJAM96/agregarr/commit/7c3478cbada0d9fe16932c440b43c1b80f953723))
+
 # [2.0.0](https://github.com/LJAM96/agregarr/compare/v1.4.2...v2.0.0) (2025-12-20)
 
 
