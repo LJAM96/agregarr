@@ -1,3 +1,10 @@
+## [2.0.2](https://github.com/LJAM96/agregarr/compare/v2.0.1...v2.0.2) (2025-12-20)
+
+
+### Bug Fixes
+
+* **ci:** properly capture semantic-release outputs for Docker build ([01a5ea0](https://github.com/LJAM96/agregarr/commit/01a5ea02cb57fb48d89e7f13528d3ffa4f675d9c))
+
 ## [2.0.1](https://github.com/LJAM96/agregarr/compare/v2.0.0...v2.0.1) (2025-12-20)
 
 
