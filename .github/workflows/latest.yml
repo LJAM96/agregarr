@@ -1,6 +1,7 @@
 name: Agregarr Release
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - latest
@@ -41,7 +42,7 @@ jobs:
   build_and_push:
     name: Build & Publish Docker Images
     needs: semantic-release
-    if: needs.semantic-release.outputs.new_release_published == 'true'
+    if: needs.semantic-release.outputs.new_release_published == 'true' || github.event_name == 'workflow_dispatch'
     strategy:
       fail-fast: false
       matrix:
@@ -57,7 +58,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: v${{ needs.semantic-release.outputs.new_release_version }}
+          ref: ${{ needs.semantic-release.outputs.new_release_version && format('v{0}', needs.semantic-release.outputs.new_release_version) || github.ref }}
       - name: Convert repository name to lowercase
         id: repo
         run: echo "repository=${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT
@@ -75,9 +76,9 @@ jobs:
         with:
           images: ghcr.io/${{ steps.repo.outputs.repository }}
           tags: |
-            type=semver,pattern={{version}},value=${{ needs.semantic-release.outputs.new_release_version }}
-            type=semver,pattern={{major}}.{{minor}},value=${{ needs.semantic-release.outputs.new_release_version }}
-            type=semver,pattern={{major}},value=${{ needs.semantic-release.outputs.new_release_version }}
+            ${{ needs.semantic-release.outputs.new_release_version && format('type=semver,pattern={{{{version}}}},value={0}', needs.semantic-release.outputs.new_release_version) || '' }}
+            ${{ needs.semantic-release.outputs.new_release_version && format('type=semver,pattern={{{{major}}}}.{{{{minor}}}},value={0}', needs.semantic-release.outputs.new_release_version) || '' }}
+            ${{ needs.semantic-release.outputs.new_release_version && format('type=semver,pattern={{{{major}}}},value={0}', needs.semantic-release.outputs.new_release_version) || '' }}
             type=raw,value=latest
       - name: Build and push by digest
         id: build
@@ -135,9 +136,9 @@ jobs:
         with:
           images: ghcr.io/${{ steps.repo.outputs.repository }}
           tags: |
-            type=semver,pattern={{version}},value=${{ needs.semantic-release.outputs.new_release_version }}
-            type=semver,pattern={{major}}.{{minor}},value=${{ needs.semantic-release.outputs.new_release_version }}
-            type=semver,pattern={{major}},value=${{ needs.semantic-release.outputs.new_release_version }}
+            ${{ needs.semantic-release.outputs.new_release_version && format('type=semver,pattern={{{{version}}}},value={0}', needs.semantic-release.outputs.new_release_version) || '' }}
+            ${{ needs.semantic-release.outputs.new_release_version && format('type=semver,pattern={{{{major}}}}.{{{{minor}}}},value={0}', needs.semantic-release.outputs.new_release_version) || '' }}
+            ${{ needs.semantic-release.outputs.new_release_version && format('type=semver,pattern={{{{major}}}},value={0}', needs.semantic-release.outputs.new_release_version) || '' }}
             type=raw,value=latest
       - name: Create manifest list and push
         working-directory: /tmp/digests
@@ -146,4 +147,4 @@ jobs:
             $(printf 'ghcr.io/${{ steps.repo.outputs.repository }}@sha256:%s ' *)
       - name: Inspect image
         run: |
-          docker buildx imagetools inspect ghcr.io/${{ steps.repo.outputs.repository }}:${{ needs.semantic-release.outputs.new_release_version }}
+          docker buildx imagetools inspect ghcr.io/${{ steps.repo.outputs.repository }}:latest
