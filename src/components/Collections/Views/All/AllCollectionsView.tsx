@@ -16,7 +16,9 @@ import {
   unlinkCollectionConfig,
 } from '@app/utils/collections/linkingHandlers';
 import {
+  ArrowDownTrayIcon,
   ArrowPathIcon,
+  ArrowUpTrayIcon,
   CheckIcon,
   ExclamationTriangleIcon,
   FunnelIcon,
@@ -53,6 +55,8 @@ const messages = defineMessages({
   nameAZ: 'Name (A-Z)',
   nameZA: 'Name (Z-A)',
   bulkEdit: 'Bulk Edit',
+  export: 'Export',
+  import: 'Import',
 });
 
 // Interfaces for clean collection data display - no conversion needed
@@ -690,6 +694,76 @@ const AllCollectionsView: React.FC = () => {
     setEditingPreExistingConfig(null);
   };
 
+  const handleExport = async () => {
+    try {
+      const response = await axios.get('/api/v1/collections');
+      const data = response.data.collectionConfigs;
+      const jsonString = JSON.stringify(data, null, 2);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `agregarr-collections-${new Date()
+        .toISOString()
+        .slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      addToast('Collections exported successfully', {
+        appearance: 'success',
+        autoDismiss: true,
+      });
+    } catch (error) {
+      console.error('Failed to export collections:', error); // eslint-disable-line no-console
+      addToast('Failed to export collections', {
+        appearance: 'error',
+        autoDismiss: true,
+      });
+    }
+  };
+
+  const handleImportClick = () => {
+    const fileInput = document.getElementById('collection-import-input');
+    if (fileInput) {
+      fileInput.click();
+    }
+  };
+
+  const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const content = e.target?.result as string;
+        const configs = JSON.parse(content);
+
+        const response = await axios.post(
+          '/api/v1/collections/import',
+          configs
+        );
+
+        addToast(response.data.message, {
+          appearance: 'success',
+          autoDismiss: true,
+        });
+
+        revalidateCollections();
+      } catch (error) {
+        console.error('Failed to import collections:', error); // eslint-disable-line no-console
+        addToast('Failed to import collections. Check file format.', {
+          appearance: 'error',
+          autoDismiss: true,
+        });
+      }
+      // Reset input
+      event.target.value = '';
+    };
+    reader.readAsText(file);
+  };
+
   return (
     <>
       <PageTitle title={intl.formatMessage(messages.allCollectionsTitle)} />
@@ -710,6 +784,25 @@ const AllCollectionsView: React.FC = () => {
               <PencilSquareIcon className="mr-1 h-4 w-4" />
               {intl.formatMessage(messages.bulkEdit)}
             </Button>
+            <Button buttonType="default" buttonSize="sm" onClick={handleExport}>
+              <ArrowDownTrayIcon className="mr-1 h-4 w-4" />
+              {intl.formatMessage(messages.export)}
+            </Button>
+            <Button
+              buttonType="default"
+              buttonSize="sm"
+              onClick={handleImportClick}
+            >
+              <ArrowUpTrayIcon className="mr-1 h-4 w-4" />
+              {intl.formatMessage(messages.import)}
+            </Button>
+            <input
+              type="file"
+              id="collection-import-input"
+              className="hidden"
+              accept=".json"
+              onChange={handleImport}
+            />
             <p className="text-sm text-gray-400">
               {intl.formatMessage(messages.totalCollections, {
                 count: filteredAndSortedCollections.length,

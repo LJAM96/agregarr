@@ -1520,6 +1520,159 @@ collectionsRoutes.post('/create', isAuthenticated(), async (req, res) => {
 });
 
 /**
+ * POST /api/v1/collections/import
+ * Import collection configurations from JSON
+ */
+collectionsRoutes.post('/import', isAuthenticated(), async (req, res) => {
+  try {
+    const settings = getSettings();
+    const { IdGenerator } = await import('@server/utils/idGenerator');
+    const importedConfigs = req.body;
+
+    if (!Array.isArray(importedConfigs)) {
+      return res.status(400).json({
+        error: 'Invalid format',
+        message: 'Request body must be an array of collection configurations',
+      });
+    }
+
+    const configs = settings.plex.collectionConfigs || [];
+    const createdConfigs: CollectionConfig[] = [];
+    const skippedConfigs: { name: string; reason: string }[] = [];
+    const affectedLibraryIds: string[] = [];
+
+    // Process each imported config
+    for (const importedConfig of importedConfigs) {
+      // Basic validation
+      if (!importedConfig.name || !importedConfig.libraryId) {
+        skippedConfigs.push({
+          name: importedConfig.name || 'Unknown',
+          reason: 'Missing name or library ID',
+        });
+        continue;
+      }
+
+      // Check for duplicates in existing Agregarr collections
+      const duplicateName = configs.find(
+        (config) =>
+          config.name === importedConfig.name &&
+          config.libraryId === importedConfig.libraryId
+      );
+
+      if (duplicateName) {
+        skippedConfigs.push({
+          name: importedConfig.name,
+          reason: 'Collection already exists',
+        });
+        continue;
+      }
+
+      // Check for duplicates in pre-existing collections
+      const preExistingService = new PreExistingCollectionConfigService();
+      const preExistingConfigs = preExistingService.getConfigs();
+      const duplicatePreExisting = preExistingConfigs.find(
+        (config) =>
+          config.name === importedConfig.name &&
+          config.libraryId === importedConfig.libraryId
+      );
+
+      if (duplicatePreExisting) {
+        skippedConfigs.push({
+          name: importedConfig.name,
+          reason: 'Collection already exists (Pre-existing)',
+        });
+        continue;
+      }
+
+      // Prepare new config
+      const newConfig: CollectionConfig = {
+        ...importedConfig,
+        id: IdGenerator.generateId(), // Generate new unique ID
+        // Reset state fields
+        isActive: false,
+        needsSync: true,
+        lastSyncedAt: undefined,
+        lastModifiedAt: undefined,
+        collectionRatingKey: undefined,
+        missing: false,
+      };
+
+      // Add to lists
+      configs.push(newConfig);
+      createdConfigs.push(newConfig);
+
+      // Track library for reordering
+      const libId = Array.isArray(newConfig.libraryId)
+        ? newConfig.libraryId[0]
+        : newConfig.libraryId;
+      if (libId && !affectedLibraryIds.includes(libId)) {
+        affectedLibraryIds.push(libId);
+      }
+    }
+
+    // Save settings if changes were made
+    if (createdConfigs.length > 0) {
+      settings.plex.collectionConfigs = configs;
+      settings.save();
+
+      // Mark newly created collections as modified
+      createdConfigs.forEach((config) => {
+        settings.markCollectionModified(config.id, 'collection');
+      });
+    }
+
+    logger.info('Collection import completed', {
+      label: 'Collections API',
+      createdCount: createdConfigs.length,
+      skippedCount: skippedConfigs.length,
+    });
+
+    // Auto-reorder affected libraries
+    if (createdConfigs.length > 0) {
+      const { autoReorderLibrary } = await import('@server/routes/reorder');
+      for (const libraryId of affectedLibraryIds) {
+        try {
+          await autoReorderLibrary(libraryId, 'home');
+          await autoReorderLibrary(libraryId, 'library');
+        } catch (error) {
+          logger.warn('Failed to auto-reorder after import', {
+            label: 'Collections API - Auto Reorder',
+            libraryId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+
+      // Refresh scheduler
+      try {
+        const { IndividualCollectionScheduler } = await import(
+          '@server/lib/collections/services/IndividualCollectionScheduler'
+        );
+        await IndividualCollectionScheduler.refreshAllJobs();
+      } catch (error) {
+        logger.warn('Failed to refresh scheduler after import', error);
+      }
+    }
+
+    return res.status(200).json({
+      message: `Import complete. Created ${createdConfigs.length}, Skipped ${skippedConfigs.length}`,
+      created: createdConfigs.length,
+      skipped: skippedConfigs,
+    });
+  } catch (error) {
+    logger.error('Failed to import collections', {
+      label: 'Collections API',
+      error: error instanceof Error ? error.message : String(error),
+    });
+
+    return res.status(500).json({
+      error: 'Failed to import collections',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+/**
  * Helper function to find the next available link ID across ALL collection types
  */
 function getNextLinkId(configs: CollectionConfig[]): number {
