@@ -1,3 +1,10 @@
+# [2.2.0](https://github.com/LJAM96/agregarr/compare/v2.1.0...v2.2.0) (2025-12-22)
+
+
+### Features
+
+* implement export/import collection list ([c83aed4](https://github.com/LJAM96/agregarr/commit/c83aed4fabdf990335f8f1bbb19598b45b36c632))
+
 # [2.1.0](https://github.com/LJAM96/agregarr/compare/v2.0.3...v2.1.0) (2025-12-20)
 
 
