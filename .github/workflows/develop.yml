@@ -45,8 +45,10 @@ jobs:
           - platform: linux/amd64
             runner: ubuntu-latest
           - platform: linux/arm64
-            runner: ubuntu-latest-arm
+            runner: [self-hosted, linux, ARM64]
     runs-on: ${{ matrix.runner }}
+    permissions:
+      packages: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
