@@ -1,3 +1,10 @@
+# [2.3.0](https://github.com/LJAM96/agregarr/compare/v2.2.1...v2.3.0) (2025-12-22)
+
+
+### Features
+
+* **ci:** allow manual workflow_dispatch trigger for Docker builds ([98436f5](https://github.com/LJAM96/agregarr/commit/98436f5f1e549d7bade52637c57bc1dbe950b5aa))
+
 ## [2.2.1](https://github.com/LJAM96/agregarr/compare/v2.2.0...v2.2.1) (2025-12-22)
 
 
