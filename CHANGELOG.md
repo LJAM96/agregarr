@@ -1,3 +1,10 @@
+## [2.2.1](https://github.com/LJAM96/agregarr/compare/v2.2.0...v2.2.1) (2025-12-22)
+
+
+### Bug Fixes
+
+* **ci:** use self-hosted runner for develop arm64 builds ([5a01a02](https://github.com/LJAM96/agregarr/commit/5a01a0297d28d2307abcf234af08d62372ca1db1))
+
 # [2.2.0](https://github.com/LJAM96/agregarr/compare/v2.1.0...v2.2.0) (2025-12-22)
 
 
