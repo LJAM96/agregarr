@@ -514,7 +514,34 @@ fetchTitleRoutes.post('/', isAuthenticated(), async (req, res) => {
             });
           }
 
-          // Get list metadata to extract title
+          // Handle search URLs first - these don't need full scraping for validation
+          if (parsedUrl.type === 'search') {
+            title = 'MDBList Search Results';
+            // Try to extract a more specific title from query params
+            if (parsedUrl.searchUrl) {
+              try {
+                const urlObj = new URL(parsedUrl.searchUrl);
+                const query =
+                  urlObj.searchParams.get('q') ||
+                  urlObj.searchParams.get('q_title');
+                if (query) {
+                  title = `MDBList Search: ${query}`;
+                }
+              } catch (e) {
+                // ignore URL parse errors
+              }
+            }
+            // Determine media type from URL path
+            if (sanitizedUrl.includes('/movies/')) {
+              mediaType = 'movie';
+            } else if (sanitizedUrl.includes('/shows/')) {
+              mediaType = 'tv';
+            }
+            // Skip the heavy getCustomList call for search URLs
+            break;
+          }
+
+          // Get list metadata to extract title for non-search URLs
           // Try two approaches: first try getting by username (for other users' public lists),
           // then fallback to getting own lists (for private lists or when username endpoint fails)
           if (
@@ -562,24 +589,32 @@ fetchTitleRoutes.post('/', isAuthenticated(), async (req, res) => {
             );
             if (targetList) {
               title = targetList.name;
+              // Use mediatype from list metadata if available
+              if (targetList.mediatype === 'movie') {
+                mediaType = 'movie';
+              } else if (targetList.mediatype === 'show') {
+                mediaType = 'tv';
+              }
             }
           }
 
-          // Validate list accessibility and get data with first 10 items
-          const listData = await mdblistClient.getCustomList(sanitizedUrl, {
-            limit: 10,
-          });
+          // For non-search URLs, validate list accessibility and get data with first 10 items
+          if (!title) {
+            const listData = await mdblistClient.getCustomList(sanitizedUrl, {
+              limit: 10,
+            });
 
-          // Quick media type detection from first 10 items
-          const movies = listData.movies || [];
-          const shows = listData.shows || [];
+            // Quick media type detection from first 10 items
+            const movies = listData.movies || [];
+            const shows = listData.shows || [];
 
-          if (movies.length > 0 && shows.length > 0) {
-            mediaType = 'both';
-          } else if (movies.length > 0) {
-            mediaType = 'movie';
-          } else if (shows.length > 0) {
-            mediaType = 'tv';
+            if (movies.length > 0 && shows.length > 0) {
+              mediaType = 'both';
+            } else if (movies.length > 0) {
+              mediaType = 'movie';
+            } else if (shows.length > 0) {
+              mediaType = 'tv';
+            }
           }
         } catch (error) {
           return res.status(400).json({
@@ -595,35 +630,6 @@ fetchTitleRoutes.post('/', isAuthenticated(), async (req, res) => {
           status: 'error',
           message: 'Unsupported collection type',
         });
-    }
-
-    if (!title && type === 'mdblist') {
-      // Fallback for MDBList search URLs if title wasn't set above
-      const apiKey = getSettings().mdblist.apiKey;
-
-      if (apiKey) {
-        const MDBListAPI = (await import('@server/api/mdblist')).default;
-        const mdblistClient = new MDBListAPI(apiKey);
-        const parsedUrl = mdblistClient.parseListUrl(sanitizedUrl);
-
-        if (parsedUrl?.type === 'search') {
-          title = 'MDBList Search Results';
-          // valid search url, try to be more specific if possible
-          if (parsedUrl.searchUrl) {
-            try {
-              const urlObj = new URL(parsedUrl.searchUrl);
-              const query =
-                urlObj.searchParams.get('q') ||
-                urlObj.searchParams.get('q_title');
-              if (query) {
-                title = `MDBList Search: ${query}`;
-              }
-            } catch (e) {
-              // ignore
-            }
-          }
-        }
-      }
     }
 
     if (!title) {

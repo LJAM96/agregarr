@@ -131,12 +131,14 @@ export function validateExternalUrl(
           };
         }
         break;
-      case 'mdblist':
-        if (
-          !urlObj.pathname.match(/^\/lists\/[^/]+\/[^/?]+\/?$/) && // User lists
-          !urlObj.pathname.match(/^\/lists\/(?:external\/)?\d+\/?$/) && // ID lists & External lists
-          !urlObj.pathname.match(/^\/(shows|movies)\/?$/) // Search pages (query params validated by URL object)
-        ) {
+      case 'mdblist': {
+        const isUserList = urlObj.pathname.match(/^\/lists\/[^/]+\/[^/?]+\/?$/); // User lists
+        const isIdList = urlObj.pathname.match(
+          /^\/lists\/(?:external\/)?\d+\/?$/
+        ); // ID lists & External lists
+        const isSearchPage = urlObj.pathname.match(/^\/(shows|movies)\/?$/); // Search pages
+
+        if (!isUserList && !isIdList && !isSearchPage) {
           logger.debug('MDBList URL validation failed', {
             label: 'Collections',
             pathname: urlObj.pathname,
@@ -145,14 +147,29 @@ export function validateExternalUrl(
           return {
             isValid: false,
             error:
-              'Invalid MDBList list URL format. Expected: https://mdblist.com/lists/username/listname',
+              'Invalid MDBList list URL format. Expected: https://mdblist.com/lists/username/listname or https://mdblist.com/shows/?q=...',
           };
         }
+
+        // For search pages, preserve the query string (required for search functionality)
+        if (isSearchPage && urlObj.search) {
+          logger.debug('MDBList search URL validation passed', {
+            label: 'Collections',
+            pathname: urlObj.pathname,
+            search: urlObj.search,
+          });
+          return {
+            isValid: true,
+            sanitizedUrl: `${urlObj.protocol}//${urlObj.hostname}${urlObj.pathname}${urlObj.search}`,
+          };
+        }
+
         logger.debug('MDBList URL validation passed', {
           label: 'Collections',
           pathname: urlObj.pathname,
         });
         break;
+      }
       case 'letterboxd':
         if (
           !urlObj.pathname.match(/^\/[^/]+\/list\/[^/?]+\/?$/) &&
@@ -190,6 +207,7 @@ export function validateExternalUrl(
     }
 
     // Sanitize URL by removing unnecessary query parameters and fragments
+    // Note: MDBList search URLs with query params are handled above and returned early
     const sanitizedUrl = `${urlObj.protocol}//${urlObj.hostname}${urlObj.pathname}`;
 
     return { isValid: true, sanitizedUrl };

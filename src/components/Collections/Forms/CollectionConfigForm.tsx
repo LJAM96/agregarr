@@ -1291,7 +1291,9 @@ const CollectionFormConfigForm = ({
                     existingConfig.traktCustomListUrl ||
                     existingConfig.tmdbCustomCollectionUrl ||
                     existingConfig.imdbCustomListUrl ||
-                    existingConfig.letterboxdCustomListUrl,
+                    existingConfig.letterboxdCustomListUrl ||
+                    existingConfig.mdblistCustomListUrl ||
+                    existingConfig.anilistCustomListUrl,
                   customDays: existingConfig.customDays,
                   minimumPlays: existingConfig.minimumPlays,
                   networksCountry: existingConfig.networksCountry,
