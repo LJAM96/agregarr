@@ -42,7 +42,6 @@ jobs:
   build_and_push:
     name: Build & Publish Docker Images
     needs: semantic-release
-    if: needs.semantic-release.outputs.new_release_published == 'true' || github.event_name == 'workflow_dispatch'
     strategy:
       fail-fast: false
       matrix:
