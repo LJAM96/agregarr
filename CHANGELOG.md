@@ -1,3 +1,10 @@
+# [2.5.0](https://github.com/LJAM96/agregarr/compare/v2.4.0...v2.5.0) (2026-01-03)
+
+
+### Features
+
+* **mdblist:** fix search URL validation and form population ([6d6491a](https://github.com/LJAM96/agregarr/commit/6d6491aefeccea18bf157341748da100ad10fc9b))
+
 # [2.4.0](https://github.com/LJAM96/agregarr/compare/v2.3.0...v2.4.0) (2026-01-02)
 
 
