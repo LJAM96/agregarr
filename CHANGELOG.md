@@ -1,3 +1,10 @@
+# [2.6.0](https://github.com/LJAM96/agregarr/compare/v2.5.0...v2.6.0) (2026-01-03)
+
+
+### Features
+
+* **workflow:** remove develop workflow and fix release workflow ([61f01bd](https://github.com/LJAM96/agregarr/commit/61f01bdcc938bec1ecdf41672031eefa0c20b98e))
+
 # [2.5.0](https://github.com/LJAM96/agregarr/compare/v2.4.0...v2.5.0) (2026-01-03)
 
 
