@@ -1,3 +1,10 @@
+# [2.8.0](https://github.com/LJAM96/agregarr/compare/v2.7.0...v2.8.0) (2026-01-03)
+
+
+### Features
+
+* **workflow:** revert switch to QEMU due to user request ([c720fe1](https://github.com/LJAM96/agregarr/commit/c720fe1bfadede77cac53280d95710bace153a9e))
+
 # [2.7.0](https://github.com/LJAM96/agregarr/compare/v2.6.0...v2.7.0) (2026-01-03)
 
 
