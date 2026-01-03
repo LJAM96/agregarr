@@ -1,3 +1,10 @@
+# [2.7.0](https://github.com/LJAM96/agregarr/compare/v2.6.0...v2.7.0) (2026-01-03)
+
+
+### Features
+
+* **workflow:** switch to QEMU for ARM64 builds ([733b5d9](https://github.com/LJAM96/agregarr/commit/733b5d9435133c259595e2bd50b6019da764b797))
+
 # [2.6.0](https://github.com/LJAM96/agregarr/compare/v2.5.0...v2.6.0) (2026-01-03)
 
 
