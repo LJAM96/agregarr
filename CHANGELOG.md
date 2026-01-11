@@ -1,3 +1,10 @@
+## [2.8.1](https://github.com/LJAM96/agregarr/compare/v2.8.0...v2.8.1) (2026-01-11)
+
+
+### Bug Fixes
+
+* **collections:** preserve custom URL fields when editing ([83318cd](https://github.com/LJAM96/agregarr/commit/83318cd6bbc88fe826839287ccefdbc556979328))
+
 # [2.8.0](https://github.com/LJAM96/agregarr/compare/v2.7.0...v2.8.0) (2026-01-03)
 
 
