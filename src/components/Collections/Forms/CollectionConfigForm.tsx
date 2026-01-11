@@ -1648,6 +1648,22 @@ const CollectionFormConfigForm = ({
             radarrTagId: values.radarrTagId,
             sonarrInstanceId: values.sonarrInstanceId,
             sonarrTagId: values.sonarrTagId,
+            // Custom URL fields (explicitly preserve these fields)
+            traktCustomListUrl: (values as CollectionFormConfig)
+              .traktCustomListUrl,
+            tmdbCustomCollectionUrl: (values as CollectionFormConfig)
+              .tmdbCustomCollectionUrl,
+            imdbCustomListUrl: (values as CollectionFormConfig)
+              .imdbCustomListUrl,
+            letterboxdCustomListUrl: (values as CollectionFormConfig)
+              .letterboxdCustomListUrl,
+            mdblistCustomListUrl: (values as CollectionFormConfig)
+              .mdblistCustomListUrl,
+            anilistCustomListUrl: (values as CollectionFormConfig)
+              .anilistCustomListUrl,
+            // Other collection-specific fields
+            networksCountry: (values as CollectionFormConfig).networksCountry,
+            timePeriod: values.timePeriod,
             autoPoster: values.autoPoster,
             autoPosterTemplate: values.autoPosterTemplate,
             useTmdbFranchisePoster: values.useTmdbFranchisePoster,
