@@ -622,6 +622,11 @@ components:
           description: 'Custom MDBList list URL (e.g., https://mdblist.com/lists/username/listname)'
           example: 'https://mdblist.com/lists/garycrawfordgc/netflix-shows'
           nullable: true
+        anilistCustomListUrl:
+          type: string
+          description: 'Custom AniList list URL'
+          example: 'https://anilist.co/user/username/animelist/my-list'
+          nullable: true
         sortOrder:
           type: string
           enum:
@@ -1174,6 +1179,11 @@ components:
           type: string
           description: 'Custom MDBList list URL (e.g., https://mdblist.com/lists/username/listname)'
           example: 'https://mdblist.com/lists/garycrawfordgc/netflix-shows'
+          nullable: true
+        anilistCustomListUrl:
+          type: string
+          description: 'Custom AniList list URL'
+          example: 'https://anilist.co/user/username/animelist/my-list'
           nullable: true
         sortOrder:
           type: string
@@ -1880,6 +1890,11 @@ components:
           type: string
           description: 'Custom MDBList list URL (e.g., https://mdblist.com/lists/username/listname)'
           example: 'https://mdblist.com/lists/garycrawfordgc/netflix-shows'
+          nullable: true
+        anilistCustomListUrl:
+          type: string
+          description: 'Custom AniList list URL'
+          example: 'https://anilist.co/user/username/animelist/my-list'
           nullable: true
         letterboxdCustomListUrl:
           type: string

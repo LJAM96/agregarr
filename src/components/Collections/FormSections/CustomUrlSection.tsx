@@ -122,6 +122,19 @@ const CustomUrlSection = ({
     }
   };
 
+  const handleUrlChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    fieldName: string
+  ) => {
+    const value = e.target.value;
+    setFieldValue(fieldName, value);
+
+    // Sync to sources[0].customUrl for non-multi-source
+    if (!values.isMultiSource && values.sources && values.sources[0]) {
+      setFieldValue('sources[0].customUrl', value);
+    }
+  };
+
   // Custom Trakt List URL
   if (values.type === 'trakt' && values.subtype === 'custom') {
     return (
@@ -140,6 +153,9 @@ const CustomUrlSection = ({
             name="traktCustomListUrl"
             placeholder="https://trakt.tv/users/username/lists/listname or https://app.trakt.tv/users/username/lists/listname"
             className="flex-1 rounded-md border border-stone-500 bg-stone-700 px-3 py-2 text-white placeholder-gray-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+              handleUrlChange(e, 'traktCustomListUrl')
+            }
           />
           {fetchTraktTitle && (
             <button
@@ -189,6 +205,9 @@ const CustomUrlSection = ({
             name="tmdbCustomCollectionUrl"
             placeholder="https://www.themoviedb.org/collection/12345, list/310, network/213, or company/7505/movie"
             className="flex-1 rounded-md border border-stone-500 bg-stone-700 px-3 py-2 text-white placeholder-gray-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+              handleUrlChange(e, 'tmdbCustomCollectionUrl')
+            }
           />
           {fetchTmdbTitle && (
             <button
@@ -238,6 +257,9 @@ const CustomUrlSection = ({
             name="imdbCustomListUrl"
             placeholder="https://www.imdb.com/list/ls123456789/ or https://www.imdb.com/user/ur12345678/watchlist"
             className="flex-1 rounded-md border border-stone-500 bg-stone-700 px-3 py-2 text-white placeholder-gray-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+              handleUrlChange(e, 'imdbCustomListUrl')
+            }
           />
           {fetchImdbTitle && (
             <button
@@ -288,6 +310,9 @@ const CustomUrlSection = ({
               name="letterboxdCustomListUrl"
               placeholder="https://letterboxd.com/username/list/listname/"
               className="flex-1 rounded-md border border-stone-500 bg-stone-700 px-3 py-2 text-white placeholder-gray-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                handleUrlChange(e, 'letterboxdCustomListUrl')
+              }
             />
             {fetchLetterboxdTitle && (
               <button
@@ -331,6 +356,9 @@ const CustomUrlSection = ({
               name="letterboxdCustomListUrl"
               placeholder="https://letterboxd.com/username/watchlist/"
               className="flex-1 rounded-md border border-stone-500 bg-stone-700 px-3 py-2 text-white placeholder-gray-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                handleUrlChange(e, 'letterboxdCustomListUrl')
+              }
             />
             {fetchLetterboxdTitle && (
               <button
@@ -378,6 +406,9 @@ const CustomUrlSection = ({
             name="anilistCustomListUrl"
             placeholder="https://anilist.co/animelist/{listname} or https://anilist.co/user/{username}/animelist/{listname}"
             className="flex-1 rounded-md border border-gray-600 bg-gray-700 px-3 py-2 text-white placeholder-gray-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+              handleUrlChange(e, 'anilistCustomListUrl')
+            }
           />
           {fetchAnilistTitle && (
             <button
@@ -432,6 +463,9 @@ const CustomUrlSection = ({
                 : 'https://mdblist.com/lists/username/list-name'
             }
             className="flex-1 rounded-md border border-stone-500 bg-stone-700 px-3 py-2 text-white placeholder-gray-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+              handleUrlChange(e, 'mdblistCustomListUrl')
+            }
           />
           {fetchMdblistTitle && (
             <button
