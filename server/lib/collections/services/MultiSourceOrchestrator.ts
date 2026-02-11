@@ -391,6 +391,28 @@ export class MultiSourceOrchestrator {
         }
       );
 
+      // Tag existing items in Radarr/Sonarr (if enabled)
+      try {
+        const { existingItemTagService } = await import(
+          './ExistingItemTagService'
+        );
+        await existingItemTagService.tagExistingItems(
+          finalItems,
+          configForSync as unknown as CollectionConfig,
+          'multi-source'
+        );
+      } catch (tagError) {
+        // Log but don't fail the sync if tagging fails
+        logger.warn(
+          `Failed to tag existing items in Radarr/Sonarr for multi-source collection: ${collectionNameForSync}`,
+          {
+            label: 'Multi-Source Orchestrator',
+            error:
+              tagError instanceof Error ? tagError.message : String(tagError),
+          }
+        );
+      }
+
       // Handle placeholder cleanup for multi-source collection
       // If createPlaceholdersForMissing enabled: cleans up released/orphaned/stale items
       // If createPlaceholdersForMissing disabled: deletes all placeholder records
@@ -1220,7 +1242,7 @@ export class MultiSourceOrchestrator {
    *
    * Note: This uses releaseDateSortValue from the item's metadata which is
    * set by the Coming Soon collection sync based on the same priority logic
-   * as banner display (Digital > Physical > Theatrical > Generic)
+   * as banner display (earliest of Digital/Physical > Theatrical > Generic)
    *
    * Note: 360-day filtering is already applied by the Coming Soon source's applyCommonFiltering
    */
@@ -1686,10 +1708,61 @@ export class MultiSourceOrchestrator {
             );
 
             collectionRatingKey = existingCollection.ratingKey;
-            await plexClient.updateCollectionContents(
+            const updateResult = await plexClient.updateCollectionContents(
               collectionRatingKey,
               plexItems
             );
+
+            // Label items that fell out of the collection as stale
+            if (updateResult.removedKeys.length > 0) {
+              for (const removedKey of updateResult.removedKeys) {
+                try {
+                  await plexClient.addLabelToItem(removedKey, 'agregarr-stale');
+                } catch (error) {
+                  logger.warn(
+                    `Failed to add agregarr-stale label to item ${removedKey}`,
+                    {
+                      label: 'Multi-Source Orchestrator',
+                      error:
+                        error instanceof Error ? error.message : String(error),
+                    }
+                  );
+                }
+              }
+              logger.info(
+                `Labeled ${updateResult.removedKeys.length} removed items as agregarr-stale in collection ${collectionName}`,
+                { label: 'Multi-Source Orchestrator' }
+              );
+            }
+
+            // Clean up stale labels for items still in this collection
+            const currentPlexKeys = new Set(
+              plexItems.map((item) => item.ratingKey)
+            );
+            const staleItems = await plexClient.getItemsWithLabel(
+              options.libraryKey,
+              'agregarr-stale'
+            );
+            for (const staleKey of staleItems) {
+              if (currentPlexKeys.has(staleKey)) {
+                try {
+                  await plexClient.removeLabelFromItem(
+                    staleKey,
+                    'agregarr-stale'
+                  );
+                } catch (error) {
+                  logger.warn(
+                    `Failed to remove agregarr-stale label from item ${staleKey}`,
+                    {
+                      label: 'Multi-Source Orchestrator',
+                      error:
+                        error instanceof Error ? error.message : String(error),
+                    }
+                  );
+                }
+              }
+            }
+
             updated = 1;
           }
         }
@@ -1833,13 +1906,21 @@ export class MultiSourceOrchestrator {
     options: MetadataUpdateOptions,
     items: CollectionItem[]
   ): Promise<void> {
-    // 1. Add proper Agregarr label (replaces any existing Agregarr labels)
+    // Add proper Agregarr label (replaces any existing Agregarr labels)
     await plexClient.addLabelToCollection(
       collectionRatingKey,
       options.customLabel
     );
 
-    // 2. Update visibility settings
+    // Update collection title to reflect any name changes
+    if (options.config.name) {
+      await plexClient.updateCollectionTitle(
+        collectionRatingKey,
+        options.config.name
+      );
+    }
+
+    // Update visibility settings
     const visibilityConfig = options.visibilityConfig;
     if (visibilityConfig) {
       const hasAnyVisibility =
@@ -1857,7 +1938,7 @@ export class MultiSourceOrchestrator {
       }
     }
 
-    // 3. Apply sortTitle for promoted collections and reordering
+    // Apply sortTitle for promoted collections and reordering
     if (options.sortOrderLibrary !== undefined) {
       await this.updateSortTitle(
         plexClient,
@@ -1867,7 +1948,7 @@ export class MultiSourceOrchestrator {
       );
     }
 
-    // 4. Generate poster if autoPoster is enabled
+    // Generate poster if autoPoster is enabled
     if (options.config.autoPoster !== false) {
       await this.generateMultiSourcePoster(
         options.config,
@@ -1877,7 +1958,7 @@ export class MultiSourceOrchestrator {
       );
     }
 
-    // 5. Update wallpaper/art if enabled and provided
+    // Update wallpaper/art if enabled and provided
     const customWallpaper = options.config?.customWallpaper;
     const enableCustomWallpaper =
       options.config?.enableCustomWallpaper ?? false;
@@ -1998,7 +2079,7 @@ export class MultiSourceOrchestrator {
       }
     }
 
-    // 6. Update summary if enabled and provided
+    // Update summary if enabled and provided
     const customSummary = options.config?.customSummary;
     const enableCustomSummary = options.config?.enableCustomSummary ?? false;
     if (enableCustomSummary && customSummary) {
@@ -2024,7 +2105,7 @@ export class MultiSourceOrchestrator {
       }
     }
 
-    // 7. Update theme if enabled and provided
+    // Update theme if enabled and provided
     const customTheme = options.config?.customTheme;
     const enableCustomTheme = options.config?.enableCustomTheme ?? false;
     if (enableCustomTheme && customTheme) {
@@ -2948,6 +3029,7 @@ export class MultiSourceOrchestrator {
         favorited: 'Most Favorited',
         boxoffice: 'Box Office',
         recommendations: 'Recommendations',
+        watchlist: 'Watchlist',
       },
       tmdb: {
         trending_day: 'Trending Today',
@@ -2975,6 +3057,14 @@ export class MultiSourceOrchestrator {
           }`,
         most_popular_duration: (src) =>
           `Most Popular (by Watch Duration)${
+            src.customDays ? ` - ${src.customDays} Days` : ''
+          }`,
+        most_watched_plays: (src) =>
+          `Most Watched (by Play Count)${
+            src.customDays ? ` - ${src.customDays} Days` : ''
+          }`,
+        most_watched_duration: (src) =>
+          `Most Watched (by Watch Duration)${
             src.customDays ? ` - ${src.customDays} Days` : ''
           }`,
       },

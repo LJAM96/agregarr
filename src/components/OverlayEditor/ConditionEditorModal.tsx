@@ -1,4 +1,4 @@
-import Modal from '@app/components/Common/Modal';
+import Button from '@app/components/Common/Button';
 import type { DragEndEvent } from '@dnd-kit/core';
 import {
   closestCenter,
@@ -16,6 +16,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { Dialog } from '@headlessui/react';
 import { Bars3Icon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import type {
   ApplicationCondition,
@@ -24,6 +25,7 @@ import type {
 } from '@server/entity/OverlayTemplate';
 import { useEffect, useRef, useState } from 'react';
 import { defineMessages, useIntl } from 'react-intl';
+import Select from 'react-select';
 import useSWR from 'swr';
 import { CONDITION_FIELD_CATEGORIES } from './types';
 
@@ -52,6 +54,7 @@ const messages = defineMessages({
   opLessThan: 'less than',
   opLessOrEqual: 'less than or equal',
   opContains: 'contains',
+  opNotContains: 'does not contain',
   opRegex: 'regex',
   opBegins: 'begins with',
   opEnds: 'ends with',
@@ -104,6 +107,8 @@ const BOOLEAN_FIELDS = [
   'dolbyVision',
   'isImdbTop250',
   'rtCertifiedFresh',
+  'rtVerifiedHot',
+  'hasSubtitles',
 ];
 
 // ============================================================================
@@ -148,6 +153,8 @@ const RuleItem: React.FC<RuleItemProps> = ({
   const isRadarrTags = field === 'radarrTags';
   const isSonarrTags = field === 'sonarrTags';
   const isTagField = isRadarrTags || isSonarrTags;
+  const isCollectionField = field === 'collection';
+  const isPlexLabels = field === 'plexLabels';
   const isExistsOperator = operator === 'exists';
 
   // Fetch all tags from all Radarr instances
@@ -161,6 +168,72 @@ const RuleItem: React.FC<RuleItemProps> = ({
     isSonarrTags ? '/api/v1/settings/sonarr/alltags' : null,
     (url) => fetch(url).then((res) => res.json())
   );
+
+  // Fetch Plex labels for plexLabels field
+  const { data: plexLabelsData } = useSWR<{
+    labels: string[];
+  }>(isPlexLabels ? '/api/v1/plex/labels' : null, (url) =>
+    fetch(url).then((res) => res.json())
+  );
+
+  // Fetch collections for collection field (agregarr + pre-existing)
+  const { data: agregarrCollections } = useSWR<{
+    collectionConfigs: { id: string; name: string; libraryName: string }[];
+  }>(isCollectionField ? '/api/v1/collections' : null, (url) =>
+    fetch(url).then((res) => res.json())
+  );
+
+  const { data: preExistingCollections } = useSWR<
+    { id: string; name: string; libraryName: string }[]
+  >(isCollectionField ? '/api/v1/preexisting' : null, (url) =>
+    fetch(url).then((res) => res.json())
+  );
+
+  // Group collections by library name for the dropdown
+  const collectionOptionsByLibrary: {
+    label: string;
+    options: { value: string; label: string }[];
+  }[] = (() => {
+    if (!isCollectionField) return [];
+
+    const grouped = new Map<string, { value: string; label: string }[]>();
+
+    for (const c of agregarrCollections?.collectionConfigs || []) {
+      const lib = c.libraryName || 'Unknown Library';
+      if (!grouped.has(lib)) grouped.set(lib, []);
+      grouped.get(lib)?.push({ value: c.id, label: c.name });
+    }
+
+    for (const c of Array.isArray(preExistingCollections)
+      ? preExistingCollections
+      : []) {
+      const lib = c.libraryName || 'Unknown Library';
+      if (!grouped.has(lib)) grouped.set(lib, []);
+      grouped.get(lib)?.push({
+        value: c.id,
+        label: `${c.name} (Plex)`,
+      });
+    }
+
+    return Array.from(grouped.entries()).map(([lib, options]) => ({
+      label: lib,
+      options,
+    }));
+  })();
+
+  // Flat list for value lookup
+  const allCollectionOptions = collectionOptionsByLibrary.flatMap(
+    (g) => g.options
+  );
+
+  // Build flat list of Plex label options
+  const plexLabelsOptions: { value: string; label: string }[] =
+    isPlexLabels && plexLabelsData?.labels
+      ? plexLabelsData.labels.map((labelName) => ({
+          value: labelName,
+          label: labelName,
+        }))
+      : [];
 
   const availableTags = isRadarrTags
     ? Array.isArray(radarrTags)
@@ -182,7 +255,9 @@ const RuleItem: React.FC<RuleItemProps> = ({
     const numericOnlyOperators = ['gt', 'gte', 'lt', 'lte'];
     const isInvalid =
       (!isNumeric && numericOnlyOperators.includes(operator)) ||
-      (isBoolean && !['eq', 'neq'].includes(operator));
+      (isBoolean && !['eq', 'neq'].includes(operator)) ||
+      (isCollectionField && !['eq', 'neq'].includes(operator)) ||
+      (isPlexLabels && !['eq', 'neq'].includes(operator));
 
     if (isInvalid) {
       lastSanitizedKey.current = sanitizeKey;
@@ -219,12 +294,17 @@ const RuleItem: React.FC<RuleItemProps> = ({
           const newField = e.target.value;
           const isNewFieldBoolean = BOOLEAN_FIELDS.includes(newField);
           const isNewFieldNumeric = NUMERIC_FIELDS.includes(newField);
+          const isNewFieldCollection = newField === 'collection';
 
           // Determine if current operator is valid for new field type
           const numericOnlyOperators = ['gt', 'gte', 'lt', 'lte'];
+          const isNewFieldPlexLabels = newField === 'plexLabels';
           const isCurrentOperatorInvalid =
             (!isNewFieldNumeric && numericOnlyOperators.includes(operator)) ||
-            (isNewFieldBoolean && !['eq', 'neq', 'exists'].includes(operator));
+            (isNewFieldBoolean &&
+              !['eq', 'neq', 'exists'].includes(operator)) ||
+            (isNewFieldCollection && !['eq', 'neq'].includes(operator)) ||
+            (isNewFieldPlexLabels && !['eq', 'neq'].includes(operator));
 
           // Reset to appropriate defaults when changing field
           onChange({
@@ -281,11 +361,14 @@ const RuleItem: React.FC<RuleItemProps> = ({
             </option>
           </>
         )}
-        {!isBoolean && (
+        {!isBoolean && !isCollectionField && !isPlexLabels && (
           <>
             <option value="in">{intl.formatMessage(messages.opIn)}</option>
             <option value="contains">
               {intl.formatMessage(messages.opContains)}
+            </option>
+            <option value="notContains">
+              {intl.formatMessage(messages.opNotContains)}
             </option>
             <option value="regex">
               {intl.formatMessage(messages.opRegex)}
@@ -296,7 +379,11 @@ const RuleItem: React.FC<RuleItemProps> = ({
             <option value="ends">{intl.formatMessage(messages.opEnds)}</option>
           </>
         )}
-        <option value="exists">{intl.formatMessage(messages.opExists)}</option>
+        {!isCollectionField && !isPlexLabels && (
+          <option value="exists">
+            {intl.formatMessage(messages.opExists)}
+          </option>
+        )}
       </select>
 
       {/* Value Input */}
@@ -332,6 +419,172 @@ const RuleItem: React.FC<RuleItemProps> = ({
             </option>
           ))}
         </select>
+      ) : isPlexLabels ? (
+        <Select
+          options={plexLabelsOptions}
+          value={
+            plexLabelsOptions.find((o) => o.value === String(value)) || null
+          }
+          onChange={(selected) => {
+            onChange({
+              ...rule,
+              value: selected?.value || '',
+            });
+          }}
+          placeholder="Select label..."
+          isClearable
+          className="react-select-container flex-1"
+          classNamePrefix="react-select"
+          menuPlacement="auto"
+          menuPortalTarget={document.body}
+          styles={{
+            control: (base) => ({
+              ...base,
+              minHeight: 'unset',
+              fontSize: '0.875rem',
+            }),
+            valueContainer: (base) => ({
+              ...base,
+              padding: '0 8px',
+            }),
+            input: (base) => ({
+              ...base,
+              margin: 0,
+              padding: 0,
+              fontSize: '0.875rem',
+              color: '#e7e5e4',
+            }),
+            indicatorsContainer: (base) => ({
+              ...base,
+              '> div': { padding: '2px 4px' },
+            }),
+            option: (base, state) => ({
+              ...base,
+              fontSize: '0.75rem',
+              padding: '6px 12px',
+              backgroundColor: state.isFocused ? '#57534e' : '#44403c',
+              color: '#e7e5e4',
+              cursor: 'pointer',
+              ':active': {
+                backgroundColor: '#78716c',
+              },
+            }),
+            singleValue: (base) => ({
+              ...base,
+              fontSize: '0.875rem',
+            }),
+            placeholder: (base) => ({
+              ...base,
+              fontSize: '0.875rem',
+            }),
+            groupHeading: (base) => ({
+              ...base,
+              fontSize: '0.625rem',
+              fontWeight: 600,
+              color: '#fb923c',
+              textTransform: 'uppercase',
+              padding: '4px 12px',
+            }),
+            menu: (base) => ({
+              ...base,
+              fontSize: '0.75rem',
+              backgroundColor: '#44403c',
+              border: '1px solid #57534e',
+            }),
+            menuPortal: (base) => ({
+              ...base,
+              zIndex: 9999,
+            }),
+            noOptionsMessage: (base) => ({
+              ...base,
+              color: '#a8a29e',
+              fontSize: '0.75rem',
+            }),
+          }}
+        />
+      ) : isCollectionField ? (
+        <Select
+          options={collectionOptionsByLibrary}
+          value={
+            allCollectionOptions.find((o) => o.value === String(value)) || null
+          }
+          onChange={(selected) => {
+            onChange({
+              ...rule,
+              value: selected?.value || '',
+            });
+          }}
+          placeholder="Select collection..."
+          isClearable
+          className="react-select-container flex-1"
+          classNamePrefix="react-select"
+          menuPlacement="auto"
+          menuPortalTarget={document.body}
+          styles={{
+            control: (base) => ({
+              ...base,
+              minHeight: 'unset',
+              fontSize: '0.875rem',
+            }),
+            valueContainer: (base) => ({
+              ...base,
+              padding: '0 8px',
+            }),
+            input: (base) => ({
+              ...base,
+              margin: 0,
+              padding: 0,
+              fontSize: '0.875rem',
+              color: '#e7e5e4',
+            }),
+            indicatorsContainer: (base) => ({
+              ...base,
+              '> div': { padding: '2px 4px' },
+            }),
+            option: (base, state) => ({
+              ...base,
+              fontSize: '0.75rem',
+              padding: '6px 12px',
+              backgroundColor: state.isFocused ? '#57534e' : '#44403c',
+              color: '#e7e5e4',
+              cursor: 'pointer',
+              ':active': {
+                backgroundColor: '#78716c',
+              },
+            }),
+            singleValue: (base) => ({
+              ...base,
+              fontSize: '0.875rem',
+            }),
+            placeholder: (base) => ({
+              ...base,
+              fontSize: '0.875rem',
+            }),
+            groupHeading: (base) => ({
+              ...base,
+              fontSize: '0.625rem',
+              fontWeight: 600,
+              color: '#fb923c',
+              textTransform: 'uppercase',
+              padding: '4px 12px',
+            }),
+            menu: (base) => ({
+              ...base,
+              fontSize: '0.75rem',
+              backgroundColor: '#44403c',
+              border: '1px solid #57534e',
+            }),
+            menuPortal: (base) => ({
+              ...base,
+              zIndex: 9999,
+            }),
+            noOptionsMessage: (base) => ({
+              ...base,
+              color: '#a8a29e',
+              fontSize: '0.75rem',
+            }),
+          }}
+        />
       ) : (
         <input
           type={isNumeric ? 'number' : 'text'}
@@ -712,25 +965,45 @@ export const ConditionEditorModal: React.FC<ConditionEditorModalProps> = ({
   };
 
   return (
-    <Modal
-      title={intl.formatMessage(messages.title)}
-      onCancel={handleCancel}
-      onOk={handleSave}
-      okText={intl.formatMessage(messages.save)}
-      cancelText={intl.formatMessage(messages.cancel)}
-      backgroundClickable={false}
-      customMaxWidth="sm:max-w-4xl"
-    >
-      <div className="space-y-4">
-        <p className="text-sm text-stone-400">
-          {intl.formatMessage(messages.description)}
-        </p>
+    <Dialog open={isOpen} onClose={handleCancel} className="relative z-[60]">
+      {/* Backdrop */}
+      <div className="fixed inset-0 bg-black/75" aria-hidden="true" />
 
-        <div className="max-h-[600px] overflow-y-auto rounded border border-stone-700 bg-stone-900 p-4">
-          <ConditionBuilder condition={condition} onChange={setCondition} />
-        </div>
+      {/* Full-screen container for centering */}
+      <div className="fixed inset-0 flex items-center justify-center p-4">
+        <Dialog.Panel className="w-full max-w-4xl rounded-lg bg-stone-800 p-4 shadow-xl ring-1 ring-gray-700">
+          {/* Header */}
+          <Dialog.Title className="text-agregarr mb-4 text-2xl font-bold">
+            {intl.formatMessage(messages.title)}
+          </Dialog.Title>
+
+          {/* Content */}
+          <div className="space-y-4">
+            <p className="text-sm text-stone-400">
+              {intl.formatMessage(messages.description)}
+            </p>
+
+            <div className="max-h-[600px] overflow-y-auto rounded border border-stone-700 bg-stone-900 p-4">
+              <ConditionBuilder condition={condition} onChange={setCondition} />
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="mt-5 flex flex-row-reverse sm:mt-4">
+            <Button buttonType="primary" onClick={handleSave}>
+              {intl.formatMessage(messages.save)}
+            </Button>
+            <Button
+              buttonType="default"
+              onClick={handleCancel}
+              className="mr-3"
+            >
+              {intl.formatMessage(messages.cancel)}
+            </Button>
+          </div>
+        </Dialog.Panel>
       </div>
-    </Modal>
+    </Dialog>
   );
 };
 

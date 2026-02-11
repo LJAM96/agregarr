@@ -71,7 +71,12 @@ export async function fetchMonitoredMovies(
     config.placeholderDaysAhead || config.comingSoonDays || 360;
   const maxDate = getFutureDateFromToday(maxDaysAway);
 
-  for (const radarrInstance of settings.radarr) {
+  // Filter to specific server if configured
+  const radarrInstances = config.comingSoonRadarrServerId
+    ? settings.radarr.filter((r) => r.id === config.comingSoonRadarrServerId)
+    : settings.radarr;
+
+  for (const radarrInstance of radarrInstances) {
     try {
       const radarrClient = new RadarrAPI({
         url: `${radarrInstance.useSsl ? 'https' : 'http'}://${
@@ -120,6 +125,24 @@ export async function fetchMonitoredMovies(
           continue;
         }
 
+        // Apply tag filtering if configured
+        if (
+          config.comingSoonFilterByTags &&
+          config.comingSoonRadarrTagIds &&
+          config.comingSoonRadarrTagIds.length > 0
+        ) {
+          const movieTags = movie.tags || [];
+          const hasMatchingTag = config.comingSoonRadarrTagIds.some((tagId) =>
+            movieTags.includes(tagId)
+          );
+          if (config.comingSoonTagMode === 'exclude') {
+            if (hasMatchingTag) continue; // Exclude movies with any selected tag
+          } else {
+            // 'include' mode (default)
+            if (!hasMatchingTag) continue; // Only include movies with at least one selected tag
+          }
+        }
+
         // Check if movie is actually upcoming (not already released/available)
         const isUpcoming = await isMovieUpcoming(movie);
         if (!isUpcoming) {
@@ -143,8 +166,9 @@ export async function fetchMonitoredMovies(
           continue;
         }
 
-        // Check if release date is within 360-day window
+        // Check if release date is within configured window
         // CRITICAL: Apply +3 month estimate for theatrical-only releases BEFORE filtering
+        // BUT only if Radarr hasn't already estimated a digital release date
         let releaseDate: Date | null = null;
         let isEstimated = false;
 
@@ -153,11 +177,31 @@ export async function fetchMonitoredMovies(
         } else if (movie.physicalRelease) {
           releaseDate = new Date(movie.physicalRelease);
         } else if (movie.releaseDate) {
-          // Only theatrical/generic - add 3 months estimate for filtering
           const baseDate = new Date(movie.releaseDate);
-          baseDate.setDate(baseDate.getDate() + 90);
-          releaseDate = baseDate;
-          isEstimated = true;
+
+          // Check if Radarr has already estimated a digital release date
+          // If releaseDate is significantly after inCinemas (30+ days), Radarr has already
+          // added an estimate - don't double-add 90 days
+          const inCinemasDate = movie.inCinemas
+            ? new Date(movie.inCinemas)
+            : null;
+          const daysDifference = inCinemasDate
+            ? Math.round(
+                (baseDate.getTime() - inCinemasDate.getTime()) /
+                  (24 * 60 * 60 * 1000)
+              )
+            : 0;
+
+          if (daysDifference >= 30) {
+            // Radarr has already estimated digital release, use as-is
+            releaseDate = baseDate;
+            isEstimated = false;
+          } else {
+            // releaseDate is same as or close to inCinemas - add 3 month estimate
+            baseDate.setDate(baseDate.getDate() + 90);
+            releaseDate = baseDate;
+            isEstimated = true;
+          }
         }
 
         if (releaseDate && releaseDate > maxDate) {
@@ -241,7 +285,12 @@ export async function fetchMonitoredShows(
   const maxDaysAway =
     config.placeholderDaysAhead || config.comingSoonDays || 360;
 
-  for (const sonarrInstance of settings.sonarr) {
+  // Filter to specific server if configured
+  const sonarrInstances = config.comingSoonSonarrServerId
+    ? settings.sonarr.filter((s) => s.id === config.comingSoonSonarrServerId)
+    : settings.sonarr;
+
+  for (const sonarrInstance of sonarrInstances) {
     try {
       const sonarrClient = new SonarrAPI({
         url: `${sonarrInstance.useSsl ? 'https' : 'http'}://${
@@ -261,6 +310,23 @@ export async function fetchMonitoredShows(
       for (const series of allSeries) {
         if (!series.monitored) {
           continue;
+        }
+
+        // Apply tag filtering if configured
+        if (
+          config.comingSoonFilterByTags &&
+          config.comingSoonSonarrTagIds &&
+          config.comingSoonSonarrTagIds.length > 0
+        ) {
+          const seriesTags = series.tags || [];
+          const hasMatchingTag = config.comingSoonSonarrTagIds.some((tagId) =>
+            seriesTags.includes(tagId)
+          );
+          if (config.comingSoonTagMode === 'exclude') {
+            if (hasMatchingTag) continue;
+          } else {
+            if (!hasMatchingTag) continue;
+          }
         }
 
         // Skip daily shows (soaps, talk shows) - they always have "upcoming" episodes
@@ -734,11 +800,19 @@ export async function fetchTmdbComingSoonMovies(
           const inCinemas = extracted.inCinemas;
           let earliestReleaseDate = extracted.earliestReleaseDate || null;
 
-          // Determine release date using priority: Digital > Physical > Theatrical (+3 months)
+          // Determine release date: earliest of (Digital, Physical) > Theatrical (+3 months)
           let releaseDate: string | undefined;
           let isEstimatedDate = false;
 
-          if (digitalRelease) {
+          if (digitalRelease && physicalRelease) {
+            // Both exist - use earliest
+            const digitalDate = new Date(digitalRelease);
+            const physicalDate = new Date(physicalRelease);
+            releaseDate =
+              digitalDate < physicalDate
+                ? digitalRelease.split('T')[0]
+                : physicalRelease.split('T')[0];
+          } else if (digitalRelease) {
             releaseDate = digitalRelease.split('T')[0];
           } else if (physicalRelease) {
             releaseDate = physicalRelease.split('T')[0];
@@ -1063,15 +1137,21 @@ export async function fetchTmdbComingSoonShows(
 }
 
 /**
- * Enrich items with TMDB release dates and filter out already-released items
+ * Enrich items with TMDB release dates and optionally filter by date window
  * Adds 3-month estimate for items with only theatrical releases
- * Filters out items where the earliest digital/physical release has already passed
+ * When skipDateFilter is false (default), filters out items outside the date window
  * Modifies the array in place
+ *
+ * @param items - Array of items to enrich
+ * @param maxDaysAway - Maximum days in future to include (default 360)
+ * @param releasedDays - Days in past to include (default 0)
+ * @param skipDateFilter - When true, only enrich metadata without filtering (for non-Coming-Soon with includeAllReleasedItems)
  */
 export async function enrichWithTMDBReleaseDates(
   items: ComingSoonSourceData[],
   maxDaysAway = 360,
-  releasedDays = 0
+  releasedDays = 0,
+  skipDateFilter = false
 ): Promise<void> {
   const TmdbAPI = (await import('@server/api/themoviedb')).default;
   const tmdbClient = new TmdbAPI();
@@ -1090,6 +1170,7 @@ export async function enrichWithTMDBReleaseDates(
     itemCount: items.length,
     maxDaysAway,
     releasedDays,
+    skipDateFilter,
   });
 
   // Use SHARED helper functions - import once at the top
@@ -1132,7 +1213,7 @@ export async function enrichWithTMDBReleaseDates(
           const inCinemas =
             extracted.inCinemas || movieDetails.release_date || undefined;
 
-          // Use shared priority logic: Digital > Physical > Theatrical (+90 days)
+          // Use shared priority logic: earliest of (Digital, Physical) > Theatrical (+90 days)
           const releaseDateResult = determineReleaseDate(
             extracted.digitalRelease,
             extracted.physicalRelease,
@@ -1169,29 +1250,32 @@ export async function enrichWithTMDBReleaseDates(
           }
 
           // Filter: only include if release date is within window (past to future)
-          const earliestReleaseDate = releaseDateResult
-            ? new Date(releaseDateResult.releaseDate)
-            : extracted.earliestReleaseDate || null;
+          // Skip filtering when skipDateFilter is true (non-Coming-Soon with includeAllReleasedItems)
+          if (!skipDateFilter) {
+            const earliestReleaseDate = releaseDateResult
+              ? new Date(releaseDateResult.releaseDate)
+              : extracted.earliestReleaseDate || null;
 
-          if (
-            !earliestReleaseDate ||
-            earliestReleaseDate < minDate ||
-            earliestReleaseDate > maxDate
-          ) {
-            logger.debug(
-              'Filtering out movie (no date, too old, or too far away)',
-              {
-                label: 'PlaceholderService',
-                title: item.title,
-                earliestReleaseDate: earliestReleaseDate?.toISOString(),
-                reason: !earliestReleaseDate
-                  ? 'no date'
-                  : earliestReleaseDate < minDate
-                  ? 'too old (beyond releasedDays window)'
-                  : 'too far away (beyond daysAhead window)',
-              }
-            );
-            return { index, shouldRemove: true };
+            if (
+              !earliestReleaseDate ||
+              earliestReleaseDate < minDate ||
+              earliestReleaseDate > maxDate
+            ) {
+              logger.debug(
+                'Filtering out movie (no date, too old, or too far away)',
+                {
+                  label: 'PlaceholderService',
+                  title: item.title,
+                  earliestReleaseDate: earliestReleaseDate?.toISOString(),
+                  reason: !earliestReleaseDate
+                    ? 'no date'
+                    : earliestReleaseDate < minDate
+                    ? 'too old (beyond releasedDays window)'
+                    : 'too far away (beyond daysAhead window)',
+                }
+              );
+              return { index, shouldRemove: true };
+            }
           }
         } else if (item.mediaType === 'tv') {
           // Only enrich airDate if not already set (Sonarr already provides season-specific dates)
@@ -1241,22 +1325,28 @@ export async function enrichWithTMDBReleaseDates(
           }
 
           // Filter TV shows: check if air date is within window (past to future, timezone-aware)
-          if (item.airDate) {
-            if (!isDateWithinDays(item.airDate, maxDaysAway, releasedDays)) {
-              logger.debug('Filtering out TV show (too old or too far away)', {
+          // Skip filtering when skipDateFilter is true (non-Coming-Soon with includeAllReleasedItems)
+          if (!skipDateFilter) {
+            if (item.airDate) {
+              if (!isDateWithinDays(item.airDate, maxDaysAway, releasedDays)) {
+                logger.debug(
+                  'Filtering out TV show (too old or too far away)',
+                  {
+                    label: 'PlaceholderService',
+                    title: item.title,
+                    airDate: item.airDate,
+                  }
+                );
+                return { index, shouldRemove: true };
+              }
+            } else {
+              // No air date found, filter out
+              logger.debug('Filtering out TV show (no air date)', {
                 label: 'PlaceholderService',
                 title: item.title,
-                airDate: item.airDate,
               });
               return { index, shouldRemove: true };
             }
-          } else {
-            // No air date found, filter out
-            logger.debug('Filtering out TV show (no air date)', {
-              label: 'PlaceholderService',
-              title: item.title,
-            });
-            return { index, shouldRemove: true };
           }
         }
 
@@ -1275,8 +1365,8 @@ export async function enrichWithTMDBReleaseDates(
           tmdbId: item.tmdbId,
           error: error instanceof Error ? error.message : String(error),
         });
-        // Remove items that fail to fetch
-        return { index, shouldRemove: true };
+        // Remove items that fail to fetch, unless skipDateFilter is true (fail-open for non-Coming-Soon)
+        return { index, shouldRemove: !skipDateFilter };
       }
     })
   );

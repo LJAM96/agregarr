@@ -1,3 +1,4 @@
+import IncludeExcludeToggle from '@app/components/Common/IncludeExcludeToggle';
 import { defineMessages, useIntl } from 'react-intl';
 import Select, { type MultiValue } from 'react-select';
 import useSWR from 'swr';
@@ -20,10 +21,6 @@ const messages = defineMessages({
   languageFilterHelp:
     'EXCLUDE mode: Skip items with ANY selected language. INCLUDE mode: Only grab items with ANY selected language.',
   selectLanguages: 'Select languages...',
-
-  // Mode toggle
-  modeExclude: 'Exclude',
-  modeInclude: 'Include',
 
   // Select all/none
   selectAll: 'Select All',
@@ -120,33 +117,11 @@ const FilterWithMode = ({
           {intl.formatMessage(labelMessage)}
         </label>
 
-        {/* Mode Toggle Button */}
-        <div className="flex rounded-md bg-gray-700 p-1">
-          <button
-            type="button"
-            onClick={() => onModeChange('exclude')}
-            disabled={disabled}
-            className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
-              mode === 'exclude'
-                ? 'bg-orange-600 text-white'
-                : 'text-gray-300 hover:text-white'
-            } ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
-          >
-            {intl.formatMessage(messages.modeExclude)}
-          </button>
-          <button
-            type="button"
-            onClick={() => onModeChange('include')}
-            disabled={disabled}
-            className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
-              mode === 'include'
-                ? 'bg-indigo-600 text-white'
-                : 'text-gray-300 hover:text-white'
-            } ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
-          >
-            {intl.formatMessage(messages.modeInclude)}
-          </button>
-        </div>
+        <IncludeExcludeToggle
+          mode={mode}
+          onModeChange={onModeChange}
+          disabled={disabled}
+        />
       </div>
 
       {/* Select All / Deselect All buttons */}
@@ -178,63 +153,10 @@ const FilterWithMode = ({
         isDisabled={disabled || !data || data.length === 0}
         placeholder={intl.formatMessage(placeholderMessage)}
         menuPlacement="auto"
+        className="react-select-container"
         classNamePrefix="react-select"
         closeMenuOnSelect={false}
         hideSelectedOptions={false}
-        styles={{
-          menuPortal: (base) => ({ ...base, zIndex: 9999 }),
-          control: (base, state) => ({
-            ...base,
-            backgroundColor: '#44403c',
-            borderColor: state.isFocused ? '#ea580c' : '#78716c',
-            '&:hover': {
-              borderColor: '#ea580c',
-            },
-            boxShadow: state.isFocused ? '0 0 0 1px #ea580c' : 'none',
-          }),
-          menu: (base) => ({
-            ...base,
-            backgroundColor: '#44403c',
-            border: '1px solid #4b5563',
-          }),
-          option: (base, state) => ({
-            ...base,
-            backgroundColor: state.isFocused ? '#4b5563' : '#374151',
-            color: 'white',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            paddingLeft: '16px',
-            '&:before': state.isSelected
-              ? {
-                  content: '"✓"',
-                  marginRight: '8px',
-                  color: '#6366f1',
-                  fontWeight: 'bold',
-                }
-              : {
-                  content: '""',
-                  marginRight: '20px',
-                },
-          }),
-          multiValue: (base) => ({
-            ...base,
-            backgroundColor: '#57534e',
-            color: 'white',
-          }),
-          multiValueLabel: (base) => ({
-            ...base,
-            color: 'white',
-          }),
-          multiValueRemove: (base) => ({
-            ...base,
-            color: '#a8a29e',
-            '&:hover': {
-              backgroundColor: '#ef4444',
-              color: 'white',
-            },
-          }),
-        }}
       />
       <p className="mt-2 text-xs text-gray-400">
         {intl.formatMessage(helpMessage)}

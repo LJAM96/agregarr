@@ -262,6 +262,8 @@ export const getSubtypeLabel = (type: string, subtype?: string): string => {
           return 'Most Favorited All Time';
         case 'recommendations':
           return 'Recommendations';
+        case 'watchlist':
+          return 'Watchlist';
         default:
           return subtype
             .replace(/_/g, ' ')
@@ -323,6 +325,10 @@ export const getSubtypeLabel = (type: string, subtype?: string): string => {
           return 'Most Popular (Plays)';
         case 'most_popular_duration':
           return 'Most Popular (Duration)';
+        case 'most_watched_plays':
+          return 'Most Watched (Plays)';
+        case 'most_watched_duration':
+          return 'Most Watched (Duration)';
         default:
           return subtype;
       }

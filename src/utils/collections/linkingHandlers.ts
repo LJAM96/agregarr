@@ -175,6 +175,8 @@ export const linkCollectionConfig = async (
             directDownloadSonarrTags: masterConfig.directDownloadSonarrTags,
             directDownloadSonarrMonitor:
               masterConfig.directDownloadSonarrMonitor,
+            directDownloadSonarrMonitorType:
+              masterConfig.directDownloadSonarrMonitorType,
             directDownloadSonarrSearchOnAdd:
               masterConfig.directDownloadSonarrSearchOnAdd,
             overseerrRadarrServerId: masterConfig.overseerrRadarrServerId,
@@ -185,6 +187,12 @@ export const linkCollectionConfig = async (
             overseerrSonarrProfileId: masterConfig.overseerrSonarrProfileId,
             overseerrSonarrRootFolder: masterConfig.overseerrSonarrRootFolder,
             overseerrSonarrTags: masterConfig.overseerrSonarrTags,
+            comingSoonRadarrServerId: masterConfig.comingSoonRadarrServerId,
+            comingSoonSonarrServerId: masterConfig.comingSoonSonarrServerId,
+            comingSoonFilterByTags: masterConfig.comingSoonFilterByTags,
+            comingSoonTagMode: masterConfig.comingSoonTagMode,
+            comingSoonRadarrTagIds: masterConfig.comingSoonRadarrTagIds,
+            comingSoonSonarrTagIds: masterConfig.comingSoonSonarrTagIds,
             searchMissingMovies: masterConfig.searchMissingMovies,
             searchMissingTV: masterConfig.searchMissingTV,
             autoApproveMovies: masterConfig.autoApproveMovies,

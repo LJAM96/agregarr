@@ -627,6 +627,9 @@ export class TemplateEngine {
       case 'most_popular_plays':
       case 'most_popular_duration':
         return 'Most Popular';
+      case 'most_watched_plays':
+      case 'most_watched_duration':
+        return 'Most Watched';
       default:
         return subtype;
     }
@@ -651,6 +654,8 @@ export class TemplateEngine {
         return 'Box Office';
       case 'recommendations':
         return 'Recommendations';
+      case 'watchlist':
+        return 'Watchlist';
       case 'custom':
         return 'Custom List';
 

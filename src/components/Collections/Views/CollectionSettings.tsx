@@ -478,6 +478,12 @@ const CollectionSettings = ({
           radarrTagId: config.radarrTagId,
           sonarrInstanceId: config.sonarrInstanceId,
           sonarrTagId: config.sonarrTagId,
+          comingSoonRadarrServerId: config.comingSoonRadarrServerId,
+          comingSoonSonarrServerId: config.comingSoonSonarrServerId,
+          comingSoonFilterByTags: config.comingSoonFilterByTags,
+          comingSoonTagMode: config.comingSoonTagMode,
+          comingSoonRadarrTagIds: config.comingSoonRadarrTagIds,
+          comingSoonSonarrTagIds: config.comingSoonSonarrTagIds,
           sortOrder: config.sortOrder,
           timeRestriction: config.timeRestriction,
           customPoster: config.customPoster,
@@ -536,6 +542,10 @@ const CollectionSettings = ({
           }),
           ...(config.directDownloadSonarrMonitor !== undefined && {
             directDownloadSonarrMonitor: config.directDownloadSonarrMonitor,
+          }),
+          ...(config.directDownloadSonarrMonitorType !== undefined && {
+            directDownloadSonarrMonitorType:
+              config.directDownloadSonarrMonitorType,
           }),
           ...(config.directDownloadSonarrSearchOnAdd !== undefined && {
             directDownloadSonarrSearchOnAdd:
@@ -685,6 +695,7 @@ const CollectionSettings = ({
       directDownloadSonarrRootFolder: defaultSonarr?.activeDirectory,
       directDownloadSonarrTags: defaultSonarr?.tags || [],
       directDownloadSonarrMonitor: defaultSonarr?.monitorByDefault ?? true,
+      directDownloadSonarrMonitorType: defaultSonarr?.monitorType,
       directDownloadSonarrSearchOnAdd: defaultSonarr?.searchOnAdd ?? true,
     };
     setEditingConfig(newConfig);

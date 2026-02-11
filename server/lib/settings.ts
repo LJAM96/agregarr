@@ -35,6 +35,20 @@ export type CollectionSortOrder =
   | 'alphabetical_asc' // A-Z alphabetical order
   | 'alphabetical_desc'; // Z-A alphabetical order
 
+/**
+ * Sonarr monitor types - determines which episodes are monitored when adding a series
+ */
+export type SonarrMonitorType =
+  | 'all' // Monitor all episodes except specials
+  | 'future' // Monitor episodes that have not aired yet
+  | 'missing' // Monitor episodes that do not have files or have not aired yet
+  | 'existing' // Monitor episodes that have files or have not aired yet
+  | 'recent' // Monitor episodes aired within the last 90 days and future episodes
+  | 'pilot' // Only monitor the first episode of the first season
+  | 'firstSeason' // Monitor all episodes of the first season
+  | 'lastSeason' // Monitor all episodes of the last season
+  | 'none'; // No episodes will be monitored
+
 export interface Library {
   readonly key: string;
   readonly name: string;
@@ -71,7 +85,7 @@ export interface CollectionConfig {
     | 'sonarrtag'
     | 'comingsoon'
     | 'filtered_hub';
-  readonly subtype?: string; // Specific option like 'users', 'most_popular_plays', 'most_popular_duration', etc. Optional for types like recently_added
+  readonly subtype?: string; // Specific option like 'users', 'most_popular_plays', 'most_popular_duration', 'most_watched_plays', 'most_watched_duration', etc. Optional for types like recently_added
   readonly template: string; // Collection template
   readonly customMovieTemplate?: string; // Custom template for movie collections when mediaType is 'both'
   readonly customTVTemplate?: string; // Custom template for TV collections when mediaType is 'both'
@@ -108,6 +122,25 @@ export interface CollectionConfig {
   readonly smartCollectionSort?: SmartCollectionSortOption; // Sort option for smart collections
   // Custom URL fields for external collections
   readonly tmdbCustomCollectionUrl?: string;
+  // TMDB streaming service fields
+  readonly watchProviderId?: number; // TMDB watch provider ID (e.g., 337 for Disney+)
+  readonly region?: string; // Country region for streaming services (default: 'US')
+  // TMDB discover sorting (for TMDB advanced_custom_tmdb advanced discover)
+  readonly tmdbMovieSortBy?: string; // TMDB /discover/movie sort_by
+  readonly tmdbTvSortBy?: string; // TMDB /discover/tv sort_by
+  // TMDB advanced discover filters
+  readonly tmdbAdvancedFilters?: {
+    readonly filterGroups?: readonly {
+      readonly id: string;
+      readonly operator: 'and' | 'or'; // How this group combines with previous groups
+      readonly filters: readonly {
+        readonly id: string;
+        readonly field: string; // e.g., 'with_genres', 'vote_average.gte'
+        readonly operator: 'and' | 'or'; // For multi-value fields (comma vs pipe)
+        readonly value: string | number | boolean;
+      }[];
+    }[];
+  };
   // Trakt-specific fields
   readonly timePeriod?: string;
   readonly traktStatType?: 'trending' | 'popular' | 'watched';
@@ -145,6 +178,10 @@ export interface CollectionConfig {
       readonly mode: 'exclude' | 'include'; // Default: 'exclude'
       readonly values: string[]; // ISO 639-1 language codes
     };
+    readonly keywords?: {
+      readonly mode: 'exclude' | 'include'; // Default: 'exclude'
+      readonly values: number[]; // TMDB keyword IDs
+    };
   };
 
   // Direct download server selection (for downloadMode: 'direct')
@@ -158,7 +195,8 @@ export interface CollectionConfig {
   readonly directDownloadSonarrProfileId?: number; // Selected Sonarr profile ID for TV shows
   readonly directDownloadSonarrRootFolder?: string; // Selected Sonarr root folder path for TV shows
   readonly directDownloadSonarrTags?: number[]; // Selected Sonarr tags for TV shows
-  readonly directDownloadSonarrMonitor?: boolean; // Override Sonarr monitor setting for TV shows
+  readonly directDownloadSonarrMonitor?: boolean; // Override Sonarr monitor setting for TV shows (deprecated, use monitorType)
+  readonly directDownloadSonarrMonitorType?: SonarrMonitorType; // Override Sonarr monitor type for TV shows
   readonly directDownloadSonarrSearchOnAdd?: boolean; // Override Sonarr search on add setting for TV shows
   // Overseerr request configuration (for downloadMode: 'overseerr')
   readonly overseerrRadarrServerId?: number; // Override Radarr server ID for Overseerr movie requests
@@ -216,6 +254,13 @@ export interface CollectionConfig {
   // Legacy Coming Soon fields (for backward compatibility during migration)
   readonly comingSoonReleasedDays?: number; // @deprecated Use placeholderReleasedDays
   readonly comingSoonDays?: number; // @deprecated Use placeholderDaysAhead
+  // Coming Soon "Monitored" server/tag filtering
+  readonly comingSoonRadarrServerId?: number; // Selected Radarr server for coming soon monitored
+  readonly comingSoonSonarrServerId?: number; // Selected Sonarr server for coming soon monitored
+  readonly comingSoonFilterByTags?: boolean; // Enable tag filtering for coming soon monitored
+  readonly comingSoonTagMode?: 'include' | 'exclude'; // Tag filter mode
+  readonly comingSoonRadarrTagIds?: number[]; // Radarr tag IDs to filter by
+  readonly comingSoonSonarrTagIds?: number[]; // Sonarr tag IDs to filter by
   // Overlay sync option
   readonly applyOverlaysDuringSync?: boolean; // If true, apply overlays to collection items immediately after sync (default: true for Coming Soon, false for others)
   // Time restriction settings
@@ -394,6 +439,7 @@ export interface PreExistingCollectionConfig {
   enableCustomWallpaper?: boolean; // Enable custom wallpaper sync to Plex
   enableCustomSummary?: boolean; // Enable custom summary sync to Plex
   enableCustomTheme?: boolean; // Enable custom theme sync to Plex
+  applyOverlaysDuringSync?: boolean; // Apply item overlays during sync
 }
 
 export interface PlexSettings {
@@ -493,6 +539,7 @@ export interface DVRSettings {
   searchOnAdd?: boolean; // Whether to immediately search for items when added (defaults to true)
   tagRequests?: boolean;
   tagRequestsMode?: TagRequestsMode;
+  tagExistingItems?: boolean; // Apply collection tags to items that already exist in Radarr/Sonarr
 }
 
 export interface RadarrSettings extends DVRSettings {
@@ -509,6 +556,7 @@ export interface SonarrSettings extends DVRSettings {
   activeLanguageProfileId?: number;
   animeTags?: number[];
   enableSeasonFolders: boolean;
+  monitorType?: SonarrMonitorType; // Which episodes to monitor when adding series (defaults to 'all')
 }
 
 export interface WatchlistSyncSettings {
@@ -520,6 +568,7 @@ export interface WatchlistSyncSettings {
     profileId?: number; // Quality profile override
     rootFolder?: string; // Root folder override
     tags?: number[]; // Tags override
+    tagWithUsername?: boolean; // Tag media with the user's Plex username
     monitor?: boolean; // Monitor by default override
     searchOnAdd?: boolean; // Search on add override
   };
@@ -529,6 +578,7 @@ export interface WatchlistSyncSettings {
     profileId?: number; // Quality profile override
     rootFolder?: string; // Root folder override
     tags?: number[]; // Tags override
+    tagWithUsername?: boolean; // Tag media with the user's Plex username
     monitor?: boolean; // Monitor by default override
     searchOnAdd?: boolean; // Search on add override
     seasonFolder?: boolean; // Season folder override
@@ -2168,10 +2218,12 @@ export interface MultiSourceCollectionConfig {
   readonly autoApproveTV?: boolean;
   readonly maxSeasonsToRequest?: number;
   readonly seasonsPerShowLimit?: number;
+  readonly seasonGrabOrder?: SeasonGrabOrder;
   readonly maxPositionToProcess?: number;
   readonly minimumYear?: number;
   readonly minimumImdbRating?: number;
   readonly minimumRottenTomatoesRating?: number;
+  readonly minimumRottenTomatoesAudienceRating?: number;
   readonly excludedGenres?: number[];
   readonly excludedCountries?: string[];
   readonly excludedLanguages?: string[];
@@ -2200,6 +2252,7 @@ export interface MultiSourceCollectionConfig {
   readonly directDownloadSonarrRootFolder?: string;
   readonly directDownloadSonarrTags?: number[];
   readonly directDownloadSonarrMonitor?: boolean;
+  readonly directDownloadSonarrMonitorType?: SonarrMonitorType;
   readonly directDownloadSonarrSearchOnAdd?: boolean;
   readonly overseerrRadarrServerId?: number;
   readonly overseerrRadarrProfileId?: number;

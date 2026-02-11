@@ -65,14 +65,23 @@ export async function processPlaceholdersForMissingItems(
   );
   const daysAhead = getDaysAhead(config);
   const releasedDays = getReleasedDays(config);
-  await enrichWithTMDBReleaseDates(sourceData, daysAhead, releasedDays);
+  const includeAllReleased = config.includeAllReleasedItems ?? true;
+
+  // Skip date filtering in enrichment when includeAllReleasedItems is true for non-Coming-Soon collections
+  // The filtering will happen below with proper includeAllReleasedItems logic
+  const skipDateFilter = includeAllReleased && !isComingSoonCollection;
+  await enrichWithTMDBReleaseDates(
+    sourceData,
+    daysAhead,
+    releasedDays,
+    skipDateFilter
+  );
 
   // Filter by date window - only create placeholders for items within the configured window
   // When includeAllReleasedItems is true: include all past items, only filter by daysAhead for future
   // When includeAllReleasedItems is false: use window from releasedDays in past to daysAhead in future
   const { isDateWithinDays, isDateWithinFutureDays, determineReleaseDate } =
     await import('@server/utils/dateHelpers');
-  const includeAllReleased = config.includeAllReleasedItems ?? true; // Default true for new configs
 
   const filteredSourceData = sourceData.filter((item) => {
     // Determine the effective release date to check
@@ -80,9 +89,8 @@ export async function processPlaceholdersForMissingItems(
 
     if (item.mediaType === 'movie') {
       // Use the shared determineReleaseDate function which handles:
-      // Priority 1: Digital release
-      // Priority 2: Physical release
-      // Priority 3: Theatrical + 90 days estimate
+      // Priority 1: Earliest of Digital or Physical release
+      // Priority 2: Theatrical + 90 days estimate
       const result = determineReleaseDate(
         item.digitalRelease,
         item.physicalRelease,
@@ -1492,6 +1500,35 @@ async function createPlaceholders(
 
   // Check if we have any work to do (created or orphaned placeholders)
   if (createdPlaceholders.length === 0 && orphanedPlaceholders.length === 0) {
+    // No new placeholders to create, but existing DB records may have valid Plex items
+    // Return CollectionItems for items that already have placeholders with rating keys
+    const existingCollectionItems: CollectionItem[] = [];
+    for (const item of itemsWithPosters) {
+      const existingRecord = existingByTmdbId.get(item.tmdbId);
+      if (existingRecord?.plexRatingKey) {
+        const sourceItem = sourceMap.get(item.tmdbId);
+        if (sourceItem) {
+          existingCollectionItems.push({
+            ratingKey: existingRecord.plexRatingKey,
+            title: existingRecord.title,
+            type: sourceItem.mediaType,
+            tmdbId: item.tmdbId,
+          });
+        }
+      }
+    }
+
+    if (existingCollectionItems.length > 0) {
+      logger.info(
+        'Returning existing placeholder items (no new creation needed)',
+        {
+          label: 'PlaceholderService',
+          count: existingCollectionItems.length,
+        }
+      );
+      return existingCollectionItems;
+    }
+
     logger.warn(
       'No placeholder files were created and no orphaned placeholders found',
       {

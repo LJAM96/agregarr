@@ -14,6 +14,7 @@ import type {
   FilteringStats,
   MissingItem,
   PlexCollection,
+  PlexLookupResult,
   SyncResult,
   TraktSourceData,
   TraktTemplateContext,
@@ -99,6 +100,9 @@ export class TraktCollectionSync extends BaseCollectionSync<'trakt'> {
       // Apply filtering safety net (validation, deduplication, maxItems safety check)
       const { items, missingItems, mappingStats, filteringStats } =
         await this.applyFilteringToMappedItems(mappedResult, config);
+
+      // Tag existing items in Radarr/Sonarr (if enabled)
+      await this.tagExistingItemsInArr(items, config);
 
       // Handle placeholder cleanup and process missing items
       const placeholderItems = await this.handlePlaceholdersAndMissingItems(
@@ -353,6 +357,23 @@ export class TraktCollectionSync extends BaseCollectionSync<'trakt'> {
           );
 
           traktData.push(...recommendations);
+          break;
+        }
+
+        case 'watchlist': {
+          if (!settings.trakt.accessToken) {
+            throw this.createSyncError(
+              CollectionSyncErrorType.CONFIGURATION_ERROR,
+              'Trakt access token is required for watchlist'
+            );
+          }
+
+          const watchlistData = await traktClient.getWatchlist(
+            mediaType === 'tv' ? 'shows' : 'movies',
+            9999
+          );
+
+          traktData.push(...watchlistData);
           break;
         }
 
@@ -642,16 +663,7 @@ export class TraktCollectionSync extends BaseCollectionSync<'trakt'> {
     }
 
     // Use direct Plex queries instead of Media table
-    let plexLookup: Map<
-      string,
-      {
-        ratingKey: string;
-        title: string;
-        libraryKey: string;
-        addedAt?: number;
-        releaseDate?: number;
-      }
-    > = new Map();
+    let plexLookup: Map<string, PlexLookupResult> = new Map();
 
     if (plexClient) {
       // First, do library-scoped search for collection creation
@@ -681,6 +693,7 @@ export class TraktCollectionSync extends BaseCollectionSync<'trakt'> {
           title: plexItem.title, // Use Plex title (episode title) instead of lookup title (show title)
           type: lookup.mediaType,
           tmdbId: lookup.tmdbId,
+          tvdbId: plexItem.tvdbId,
           addedAt: plexItem.addedAt,
           releaseDate: plexItem.releaseDate,
           metadata: {
@@ -881,6 +894,7 @@ export class TraktCollectionSync extends BaseCollectionSync<'trakt'> {
       'favorited_all',
       'boxoffice',
       'recommendations',
+      'watchlist',
       'custom',
       'random',
     ];
@@ -936,6 +950,8 @@ export class TraktCollectionSync extends BaseCollectionSync<'trakt'> {
         return 'boxoffice';
       case 'recommendations':
         return 'recommendations';
+      case 'watchlist':
+        return 'watchlist';
       case 'custom':
         return 'custom';
       case 'random':

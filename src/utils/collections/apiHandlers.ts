@@ -229,6 +229,10 @@ export const saveIndividualConfigs = async (
           directDownloadSonarrMonitor:
             collectionConfig.directDownloadSonarrMonitor,
         }),
+        ...(collectionConfig.directDownloadSonarrMonitorType !== undefined && {
+          directDownloadSonarrMonitorType:
+            collectionConfig.directDownloadSonarrMonitorType,
+        }),
         ...(collectionConfig.directDownloadSonarrSearchOnAdd !== undefined && {
           directDownloadSonarrSearchOnAdd:
             collectionConfig.directDownloadSonarrSearchOnAdd,
@@ -256,6 +260,24 @@ export const saveIndividualConfigs = async (
         }),
         ...(collectionConfig.overseerrSonarrTags !== undefined && {
           overseerrSonarrTags: collectionConfig.overseerrSonarrTags,
+        }),
+        ...(collectionConfig.comingSoonRadarrServerId !== undefined && {
+          comingSoonRadarrServerId: collectionConfig.comingSoonRadarrServerId,
+        }),
+        ...(collectionConfig.comingSoonSonarrServerId !== undefined && {
+          comingSoonSonarrServerId: collectionConfig.comingSoonSonarrServerId,
+        }),
+        ...(collectionConfig.comingSoonFilterByTags !== undefined && {
+          comingSoonFilterByTags: collectionConfig.comingSoonFilterByTags,
+        }),
+        ...(collectionConfig.comingSoonTagMode !== undefined && {
+          comingSoonTagMode: collectionConfig.comingSoonTagMode,
+        }),
+        ...(collectionConfig.comingSoonRadarrTagIds !== undefined && {
+          comingSoonRadarrTagIds: collectionConfig.comingSoonRadarrTagIds,
+        }),
+        ...(collectionConfig.comingSoonSonarrTagIds !== undefined && {
+          comingSoonSonarrTagIds: collectionConfig.comingSoonSonarrTagIds,
         }),
         ...(collectionConfig.isMultiSource !== undefined && {
           isMultiSource: collectionConfig.isMultiSource,

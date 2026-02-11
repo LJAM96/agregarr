@@ -1,6 +1,20 @@
 import logger from '@server/logger';
 import ServarrBase from './base';
 
+/**
+ * Sonarr monitor types - determines which episodes are monitored when adding a series
+ */
+export type SonarrMonitorType =
+  | 'all' // Monitor all episodes except specials
+  | 'future' // Monitor episodes that have not aired yet
+  | 'missing' // Monitor episodes that do not have files or have not aired yet
+  | 'existing' // Monitor episodes that have files or have not aired yet
+  | 'recent' // Monitor episodes aired within the last 90 days and future episodes
+  | 'pilot' // Only monitor the first episode of the first season
+  | 'firstSeason' // Monitor all episodes of the first season
+  | 'lastSeason' // Monitor all episodes of the last season
+  | 'none'; // No episodes will be monitored
+
 export interface SonarrSeason {
   seasonNumber: number;
   monitored: boolean;
@@ -114,6 +128,7 @@ export interface AddSeriesOptions {
   tags?: number[];
   seriesType: SonarrSeries['seriesType'];
   monitored?: boolean;
+  monitorType?: SonarrMonitorType;
   searchNow?: boolean;
 }
 
@@ -126,6 +141,14 @@ export interface SonarrExclusion {
   id: number;
   tvdbId: number;
   title: string;
+}
+
+export type ApplyTagsMode = 'add' | 'remove' | 'replace';
+
+export interface SonarrBulkEditOptions {
+  seriesIds: number[];
+  tags?: number[];
+  applyTags?: ApplyTagsMode;
 }
 
 export interface SonarrPagedResponse<T> {
@@ -321,7 +344,7 @@ class SonarrAPI extends ServarrBase<{
           rootFolderPath: options.rootFolderPath,
           seriesType: options.seriesType,
           addOptions: {
-            ignoreEpisodesWithFiles: true,
+            monitor: options.monitorType || 'all',
             searchForMissingEpisodes: options.searchNow,
           },
         } as Partial<SonarrSeries>
@@ -392,6 +415,41 @@ class SonarrAPI extends ServarrBase<{
           seriesId,
         }
       );
+    }
+  }
+
+  /**
+   * Bulk add tags to multiple series without removing existing tags
+   * Uses the series editor endpoint with applyTags: 'add'
+   */
+  public async bulkAddTags(
+    seriesIds: number[],
+    tagIds: number[]
+  ): Promise<void> {
+    if (seriesIds.length === 0 || tagIds.length === 0) {
+      return;
+    }
+
+    try {
+      await this.axios.put('/series/editor', {
+        seriesIds,
+        tags: tagIds,
+        applyTags: 'add',
+      });
+
+      logger.info(`Bulk added tags to ${seriesIds.length} series`, {
+        label: 'Sonarr API',
+        seriesCount: seriesIds.length,
+        tagIds,
+      });
+    } catch (e) {
+      logger.error('Failed to bulk add tags to series', {
+        label: 'Sonarr API',
+        errorMessage: e.message,
+        seriesCount: seriesIds.length,
+        tagIds,
+      });
+      throw new Error(`[Sonarr] Failed to bulk add tags: ${e.message}`);
     }
   }
 

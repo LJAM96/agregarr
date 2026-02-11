@@ -248,12 +248,14 @@ export async function buildRenderContext(
             context.rtAudienceScore = rtRating.audienceScore;
             context.rtCertifiedFresh =
               rtRating.criticsRating === 'Certified Fresh';
+            context.rtVerifiedHot = rtRating.verifiedHot ?? false;
             logger.debug('Fetched RT ratings', {
               label: 'OverlayContextBuilder',
               title: context.title,
               criticsScore: rtRating.criticsScore,
               audienceScore: rtRating.audienceScore,
               certifiedFresh: context.rtCertifiedFresh,
+              verifiedHot: context.rtVerifiedHot,
             });
           } else {
             logger.debug('RT rating not found', {
@@ -292,6 +294,22 @@ export async function buildRenderContext(
       // Network (TV shows)
       if ('networks' in tmdbData && tmdbData.networks?.[0]) {
         context.network = tmdbData.networks[0].name;
+      }
+
+      // Country of Origin (ISO codes like "US", "GB", "DE")
+      // Both movies and TV shows have origin_country and production_countries
+      if ('origin_country' in tmdbData && tmdbData.origin_country?.length > 0) {
+        context.originCountry = tmdbData.origin_country[0];
+        context.originCountries = tmdbData.origin_country;
+      }
+      if (
+        'production_countries' in tmdbData &&
+        tmdbData.production_countries?.length > 0
+      ) {
+        context.productionCountry = tmdbData.production_countries[0].iso_3166_1;
+        context.productionCountries = tmdbData.production_countries.map(
+          (c: { iso_3166_1: string }) => c.iso_3166_1
+        );
       }
 
       // Genre (concatenate all genres for matching)
@@ -396,6 +414,34 @@ export async function buildRenderContext(
 
         context.tmdbStatus = mappedStatus;
       }
+
+      // Content ratings / certifications (per-country)
+      // Stored as contentRating:{countryCode} for per-element country selection
+      if (mediaType === 'movie' && 'release_dates' in tmdbData) {
+        const releaseResults = tmdbData.release_dates?.results;
+        if (releaseResults && Array.isArray(releaseResults)) {
+          for (const countryEntry of releaseResults) {
+            const countryCode = countryEntry.iso_3166_1;
+            // Find the first non-empty certification for this country
+            const certification = countryEntry.release_dates
+              ?.map((rd: { certification: string }) => rd.certification)
+              .find((cert: string) => cert && cert.trim() !== '');
+            if (certification) {
+              context[`contentRating:${countryCode}`] = certification;
+            }
+          }
+        }
+      } else if (mediaType === 'show' && 'content_ratings' in tmdbData) {
+        const ratingResults = tmdbData.content_ratings?.results;
+        if (ratingResults && Array.isArray(ratingResults)) {
+          for (const ratingEntry of ratingResults) {
+            if (ratingEntry.rating && ratingEntry.rating.trim() !== '') {
+              context[`contentRating:${ratingEntry.iso_3166_1}`] =
+                ratingEntry.rating;
+            }
+          }
+        }
+      }
     } catch (error) {
       logger.debug('Failed to fetch external metadata', {
         label: 'OverlayContextBuilder',
@@ -405,8 +451,8 @@ export async function buildRenderContext(
     }
   }
 
-  // Plex-specific metadata from Media (skip for placeholder items)
-  if (!isPlaceholder && item.Media?.[0]) {
+  // Plex-specific metadata from Media (extract if available, even for placeholders)
+  if (item.Media?.[0]) {
     const media = item.Media[0];
 
     // Resolution - use raw value from Plex (e.g., "720", "1080", "4k")
@@ -431,6 +477,16 @@ export async function buildRenderContext(
     // File info
     context.container = media.container;
     context.bitrate = media.bitrate;
+
+    // Extract file path and size from Part (independent of Stream data)
+    if (media.Part?.[0]) {
+      if (media.Part[0].file) {
+        context.filePath = media.Part[0].file;
+      }
+      if (media.Part[0].size) {
+        context.fileSize = media.Part[0].size;
+      }
+    }
 
     // Extract detailed info from Streams
     if (media.Part?.[0]?.Stream) {
@@ -463,29 +519,69 @@ export async function buildRenderContext(
           context.bitDepth = parseInt(String(videoStream.bitDepth), 10);
         }
       }
-      // Find audio stream (streamType 2) - prefer first one
-      const audioStream = streams.find((s) => s.streamType === 2);
-      if (audioStream) {
+      // Find all audio streams (streamType 2)
+      const audioStreams = streams.filter((s) => s.streamType === 2);
+      if (audioStreams.length > 0) {
+        // Primary audio stream (first one)
+        const primaryAudio = audioStreams[0];
+
         // Detailed audio format from displayTitle
-        if (audioStream.displayTitle) {
-          context.audioFormat = audioStream.displayTitle;
+        if (primaryAudio.displayTitle) {
+          context.audioFormat = primaryAudio.displayTitle;
         }
         // Audio channel layout
-        if (audioStream.audioChannelLayout) {
-          context.audioChannelLayout = audioStream.audioChannelLayout;
+        if (primaryAudio.audioChannelLayout) {
+          context.audioChannelLayout = primaryAudio.audioChannelLayout;
         }
-        if (audioStream.channels) {
-          context.audioChannels = audioStream.channels;
+        if (primaryAudio.channels) {
+          context.audioChannels = primaryAudio.channels;
+        }
+
+        // Primary audio language
+        if (primaryAudio.language) {
+          context.audioLanguage = primaryAudio.language;
+        }
+        if (primaryAudio.languageCode) {
+          context.audioLanguageCode = primaryAudio.languageCode;
+        }
+
+        // Collect all audio track languages (unique values only)
+        const allAudioLanguages = audioStreams
+          .map((s) => s.language)
+          .filter((lang): lang is string => !!lang);
+        const allAudioLanguageCodes = audioStreams
+          .map((s) => s.languageCode)
+          .filter((code): code is string => !!code);
+
+        if (allAudioLanguages.length > 0) {
+          context.audioLanguages = [...new Set(allAudioLanguages)];
+        }
+        if (allAudioLanguageCodes.length > 0) {
+          context.audioLanguageCodes = [...new Set(allAudioLanguageCodes)];
         }
       }
 
-      // Get file path from Part
-      if (media.Part[0].file) {
-        context.filePath = media.Part[0].file;
-      }
-      // Get file size
-      if (media.Part[0].size) {
-        context.fileSize = media.Part[0].size;
+      // Find all subtitle streams (streamType 3)
+      const subtitleStreams = streams.filter((s) => s.streamType === 3);
+      context.hasSubtitles = subtitleStreams.length > 0;
+
+      if (subtitleStreams.length > 0) {
+        // Collect all subtitle languages (unique values only)
+        const allSubtitleLanguages = subtitleStreams
+          .map((s) => s.language)
+          .filter((lang): lang is string => !!lang);
+        const allSubtitleLanguageCodes = subtitleStreams
+          .map((s) => s.languageCode)
+          .filter((code): code is string => !!code);
+
+        if (allSubtitleLanguages.length > 0) {
+          context.subtitleLanguages = [...new Set(allSubtitleLanguages)];
+        }
+        if (allSubtitleLanguageCodes.length > 0) {
+          context.subtitleLanguageCodes = [
+            ...new Set(allSubtitleLanguageCodes),
+          ];
+        }
       }
     }
   }
@@ -522,6 +618,13 @@ export async function buildRenderContext(
     if (item.index !== undefined) {
       context.episodeNumber = item.index;
     }
+  }
+
+  // Plex Labels - extract item-level tags
+  if (item.Label && Array.isArray(item.Label)) {
+    context.plexLabels = item.Label.map((l) => l.tag).filter(
+      (tag): tag is string => !!tag
+    );
   }
 
   // Maintainerr integration - calculate daysUntilAction

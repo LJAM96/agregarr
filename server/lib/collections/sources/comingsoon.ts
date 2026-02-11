@@ -148,6 +148,9 @@ export class ComingSoonCollectionSync extends BaseCollectionSync<'comingsoon'> {
       const { items, missingItems, mappingStats } =
         await this.applyFilteringToMappedItems(mappedResult, config);
 
+      // Tag existing items in Radarr/Sonarr (if enabled)
+      await this.tagExistingItemsInArr(items, config);
+
       // Handle placeholder cleanup and process missing items
       const placeholderItems = await this.handlePlaceholdersAndMissingItems(
         items,
@@ -378,17 +381,26 @@ export class ComingSoonCollectionSync extends BaseCollectionSync<'comingsoon'> {
     });
 
     // Attach releaseDateSortValue to each item for multi-source orchestrator sorting
-    // This uses the same priority logic as sortByReleaseDate: Digital > Physical > Generic
+    // Uses earliest of (Digital, Physical) > Generic for movies
     const enrichedItems = upcomingItems.map((item) => {
       let sortDate: Date | null = null;
 
       if (item.mediaType === 'movie') {
-        // Priority: Digital > Physical > Generic (actual availability, not theatrical)
+        // Earliest of Digital/Physical > Generic (actual availability, not theatrical)
         // Do NOT use inCinemas - theatrical release doesn't mean content is available for Plex
-        if (item.digitalRelease) {
-          sortDate = new Date(item.digitalRelease);
-        } else if (item.physicalRelease) {
-          sortDate = new Date(item.physicalRelease);
+        const digitalDate = item.digitalRelease
+          ? new Date(item.digitalRelease)
+          : null;
+        const physicalDate = item.physicalRelease
+          ? new Date(item.physicalRelease)
+          : null;
+
+        if (digitalDate && physicalDate) {
+          sortDate = digitalDate < physicalDate ? digitalDate : physicalDate;
+        } else if (digitalDate) {
+          sortDate = digitalDate;
+        } else if (physicalDate) {
+          sortDate = physicalDate;
         } else if (item.releaseDate) {
           sortDate = new Date(item.releaseDate);
         }
@@ -665,6 +677,7 @@ export class ComingSoonCollectionSync extends BaseCollectionSync<'comingsoon'> {
         title: itemData.title,
         type: sourceItem.mediaType || 'movie',
         tmdbId: tmdbId,
+        tvdbId: itemData.tvdbId,
         releaseDateSortValue: sourceItem.releaseDateSortValue,
       } as CollectionItem & { releaseDateSortValue?: string });
     }
@@ -822,11 +835,20 @@ export class ComingSoonCollectionSync extends BaseCollectionSync<'comingsoon'> {
       let releaseDate: Date | null = null;
 
       if (item.mediaType === 'movie') {
-        // Priority: Digital > Physical > Generic (actual availability, not theatrical)
-        if (item.digitalRelease) {
-          releaseDate = new Date(item.digitalRelease);
-        } else if (item.physicalRelease) {
-          releaseDate = new Date(item.physicalRelease);
+        // Earliest of Digital/Physical > Generic (actual availability, not theatrical)
+        const digitalDate = item.digitalRelease
+          ? new Date(item.digitalRelease)
+          : null;
+        const physicalDate = item.physicalRelease
+          ? new Date(item.physicalRelease)
+          : null;
+
+        if (digitalDate && physicalDate) {
+          releaseDate = digitalDate < physicalDate ? digitalDate : physicalDate;
+        } else if (digitalDate) {
+          releaseDate = digitalDate;
+        } else if (physicalDate) {
+          releaseDate = physicalDate;
         } else if (item.releaseDate) {
           releaseDate = new Date(item.releaseDate);
         }
@@ -883,7 +905,7 @@ export class ComingSoonCollectionSync extends BaseCollectionSync<'comingsoon'> {
 
       // Use the pre-calculated release date from TMDB enrichment
       // This was already calculated using determineReleaseDate() with proper fallbacks
-      // (Digital > Physical > Theatrical + 90 days, with movieDetails.release_date as final fallback)
+      // (earliest of Digital/Physical > Theatrical + 90 days, with movieDetails.release_date as final fallback)
       let releaseDate: Date | null = null;
 
       if (source.mediaType === 'movie') {
