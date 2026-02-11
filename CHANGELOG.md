@@ -1,3 +1,63 @@
+# [2.4.0](https://github.com/LJAM96/agregarr/compare/v2.3.0...v2.4.0) (2026-02-11)
+
+
+### Bug Fixes
+
+* **api:** pass options to ExternalAPI constructor correctly ([#413](https://github.com/LJAM96/agregarr/issues/413)) ([e482b58](https://github.com/LJAM96/agregarr/commit/e482b58a290560615bb6f79792b5ce5e06f36f90))
+* **cleanup:** prevent auto franchise collections from being deleted during full sync ([eb22483](https://github.com/LJAM96/agregarr/commit/eb2248355358e05dff9a41c7c71d64fb760d491b))
+* **collection-poster-editor:** fixes preview not resetting. adds library categorisation to dropdown ([536d373](https://github.com/LJAM96/agregarr/commit/536d3733a2141701778e08641c1d13dd5af2c99a)), closes [#373](https://github.com/LJAM96/agregarr/issues/373)
+* **collection-posters:** add pre-existing collections to preview, add real posters to content grid ([92db735](https://github.com/LJAM96/agregarr/commit/92db73514ee3861967a7a9efe25248f04e47ac60)), closes [#373](https://github.com/LJAM96/agregarr/issues/373)
+* **collection-posters:** update hbo max poster template logo, colors ([#407](https://github.com/LJAM96/agregarr/issues/407)) ([9c345f6](https://github.com/LJAM96/agregarr/commit/9c345f6622e9320025f7ca3d9fae08e088746a6a))
+* **collections:** don't double-estimate digital release dates ([#349](https://github.com/LJAM96/agregarr/issues/349)) ([be758cb](https://github.com/LJAM96/agregarr/commit/be758cbf659ebb7866ac49b2b6bfe704c8a56f14))
+* **deps:** downgrade @semantic-release/github to 11.0.6 for Node 20 compatibility ([84138da](https://github.com/LJAM96/agregarr/commit/84138dab9cb1e71296bc71e9d54862704ac087eb))
+* **filtered-hub:** use episode air date for TV recently released ([#450](https://github.com/LJAM96/agregarr/issues/450)) ([ecda355](https://github.com/LJAM96/agregarr/commit/ecda35507c4c2ee646264b15c998363bb1c78bc5)), closes [#442](https://github.com/LJAM96/agregarr/issues/442)
+* **letterboxd:** add cloudflare solver for leterboxd ([bff75b8](https://github.com/LJAM96/agregarr/commit/bff75b8111528a1283e85a7a1121f71d8a88bec2)), closes [#402](https://github.com/LJAM96/agregarr/issues/402)
+* **letterboxd:** extract title from data-item-name instead of img alt ([#405](https://github.com/LJAM96/agregarr/issues/405)) ([db4c17a](https://github.com/LJAM96/agregarr/commit/db4c17a1bae154ec2a41c8db73017b272c5681d8))
+* **letterboxd:** improve TMDB matching with year-aware search and scoring ([9016bd9](https://github.com/LJAM96/agregarr/commit/9016bd98f39e0ec80c5ef57f387673c4b6e9cdbb)), closes [#236](https://github.com/LJAM96/agregarr/issues/236)
+* **letterboxd:** resolve letterboxd items via film page TMDB links ([#454](https://github.com/LJAM96/agregarr/issues/454)) ([968d424](https://github.com/LJAM96/agregarr/commit/968d4246f5156e08a6d926fb1d5659e08185a873)), closes [#448](https://github.com/LJAM96/agregarr/issues/448)
+* **metadata:** fix incorrect release date for old releases with single modern digital release date ([cdb87f5](https://github.com/LJAM96/agregarr/commit/cdb87f5eb9820d7e086f5dc9d5adf21d79dd6255)), closes [#374](https://github.com/LJAM96/agregarr/issues/374)
+* **multi-source:** fixes collection title not updating when changed ([b510fdc](https://github.com/LJAM96/agregarr/commit/b510fdc9f29452282918eacfedc075cebc136836)), closes [#425](https://github.com/LJAM96/agregarr/issues/425)
+* **overlays:** add 'does not contain' string operator ([fad6454](https://github.com/LJAM96/agregarr/commit/fad645485bb88dc3662455add641d3a9fdf54bd5)), closes [#367](https://github.com/LJAM96/agregarr/issues/367)
+* **overlays:** add language and subtitle variables ([ea2e468](https://github.com/LJAM96/agregarr/commit/ea2e468dfb8719d37780bcd9f9f668fb7cfdd473)), closes [#389](https://github.com/LJAM96/agregarr/issues/389)
+* **overlays:** fix infinite update loop ([8742901](https://github.com/LJAM96/agregarr/commit/874290155a27a7c976a4a4149b7678d0442bc9a1))
+* **overlays:** fix release time to 12:00:00 (midday) to ensure accurate TZ adjustment ([047586c](https://github.com/LJAM96/agregarr/commit/047586c2f5a27fdeda39c0ca0ab6a84199c97ec0)), closes [#422](https://github.com/LJAM96/agregarr/issues/422)
+* **overlays:** fixes focus issue in condition editor ([c093e60](https://github.com/LJAM96/agregarr/commit/c093e60b671528efffe64040a93e04438439476b)), closes [#375](https://github.com/LJAM96/agregarr/issues/375)
+* **overlays:** proxy plex posters through backend ([b285f29](https://github.com/LJAM96/agregarr/commit/b285f290a7bfc33f6d01fa085dcb0acafc01a96e)), closes [#381](https://github.com/LJAM96/agregarr/issues/381)
+* persist applyOverlaysDuringSync for pre-existing collections ([#445](https://github.com/LJAM96/agregarr/issues/445)) ([6b89f60](https://github.com/LJAM96/agregarr/commit/6b89f60983394e48a320cf3b4780a3ff0a95ab59)), closes [#438](https://github.com/LJAM96/agregarr/issues/438)
+* **placeholders:** empty Plex trash after placeholder cleanup ([#400](https://github.com/LJAM96/agregarr/issues/400)) ([d17d872](https://github.com/LJAM96/agregarr/commit/d17d8728e942a5d9924cde8d2c276250c3fbe634))
+* **placeholders:** fixes placeholders not being added to multiple collections ([596f559](https://github.com/LJAM96/agregarr/commit/596f5596d18f1b7c84beca6d1bb6d46ec567c2b4))
+* **placeholders:** skip date filtering for non-Coming-Soon collections with includeAllReleasedItems ([#387](https://github.com/LJAM96/agregarr/issues/387)) ([56432fd](https://github.com/LJAM96/agregarr/commit/56432fd273297615505cbc8e137e534e425418d1)), closes [#336](https://github.com/LJAM96/agregarr/issues/336)
+* **radarr-sonarr:** show auto-generated tag in collection config ([627eb99](https://github.com/LJAM96/agregarr/commit/627eb99fae97585b72eb025c142d48bfcdf879a2))
+* **randomise-home-order:** process libraries separately and shuffle non-contiguous items ([e3e5514](https://github.com/LJAM96/agregarr/commit/e3e55148cddbba2afc45a0a9c3590f0db9ce5ed1)), closes [#226](https://github.com/LJAM96/agregarr/issues/226)
+* **settings:** add seasonGrabOrder and minimumRottenTomatoesAudienceRating to multi-source ([5af35df](https://github.com/LJAM96/agregarr/commit/5af35df5a60a79f79f96ce7a500d3c345b85523d)), closes [#242](https://github.com/LJAM96/agregarr/issues/242)
+* **sonarr:** add all sonarr mointoring options to main settings and collection config ([9087e84](https://github.com/LJAM96/agregarr/commit/9087e84a9f6f121bd665e3d6ddf72e35f8288f4b)), closes [#397](https://github.com/LJAM96/agregarr/issues/397)
+* use searchPerson API for person spotlight TMDB disambiguation ([#452](https://github.com/LJAM96/agregarr/issues/452)) ([bf569ae](https://github.com/LJAM96/agregarr/commit/bf569aea54bee3e97c0c59d65ccfea6494100223)), closes [#443](https://github.com/LJAM96/agregarr/issues/443)
+* **watchlist:** add username tags option for grabbing missing items from watchlist ([2acad01](https://github.com/LJAM96/agregarr/commit/2acad0162c0333958154e608e5c250440e4c4236)), closes [#427](https://github.com/LJAM96/agregarr/issues/427)
+* **watchlist:** fixes plex watchlist not respecting radarr/sonarr exclusions ([31427a8](https://github.com/LJAM96/agregarr/commit/31427a8dcc730d0f215a21a147635475aa4a47f3)), closes [#429](https://github.com/LJAM96/agregarr/issues/429)
+
+
+### Features
+
+* **collections:** Add custom TMDB Collection Builder ([#416](https://github.com/LJAM96/agregarr/issues/416)) ([3668ec2](https://github.com/LJAM96/agregarr/commit/3668ec293117a376236ab0fa1410d3751db28c4f))
+* **collections:** items that fall off collections now have a label 'agregarr-stale' added ([84db0e2](https://github.com/LJAM96/agregarr/commit/84db0e23c29e3e3e3b28fc78253490a1b057b94f)), closes [#384](https://github.com/LJAM96/agregarr/issues/384)
+* **coming-soon:** coming soon collections can now be filtered by Radarr/Sonarr server and tags ([a02e547](https://github.com/LJAM96/agregarr/commit/a02e5475f05dee11d20a1c8fd4f4657d305f966b)), closes [#406](https://github.com/LJAM96/agregarr/issues/406) [#411](https://github.com/LJAM96/agregarr/issues/411)
+* **missing-items:** tMDB Keyword added to allow for more advanced filtering ([5745991](https://github.com/LJAM96/agregarr/commit/5745991f46f17454d15e3d96d3bda4ac6813774d)), closes [#256](https://github.com/LJAM96/agregarr/issues/256)
+* **overlays:** add 'mapped icons' element, allowing variables to be mapped to icons ([09f1dbb](https://github.com/LJAM96/agregarr/commit/09f1dbbac66dd4ffd9899187eb81f4635a0fd0ce))
+* **overlays:** add ability to tag and sort overlays. add grid size option ([4baa263](https://github.com/LJAM96/agregarr/commit/4baa26302ce0b72c65056a51db2921430920627b)), closes [#376](https://github.com/LJAM96/agregarr/issues/376) [#435](https://github.com/LJAM96/agregarr/issues/435)
+* **overlays:** add Collection as condition ([af965b6](https://github.com/LJAM96/agregarr/commit/af965b66c6605ffc4d15c1c402272ad3fbd01e23)), closes [#243](https://github.com/LJAM96/agregarr/issues/243)
+* **overlays:** add date format options for US and UK/AU locales ([#446](https://github.com/LJAM96/agregarr/issues/446)) ([e81b1d5](https://github.com/LJAM96/agregarr/commit/e81b1d59526630e8a3d50aa5cdcdaca0f52c0037)), closes [#430](https://github.com/LJAM96/agregarr/issues/430)
+* **overlays:** add Plex Labels as condition ([9787db3](https://github.com/LJAM96/agregarr/commit/9787db3bda6afdac46271fc350e761a76e15be99)), closes [#243](https://github.com/LJAM96/agregarr/issues/243)
+* **overlays:** add RT Verified Hot support and preset ([9962d5e](https://github.com/LJAM96/agregarr/commit/9962d5e0efeca81513e74c0f3441e08f335c5ad8)), closes [#394](https://github.com/LJAM96/agregarr/issues/394)
+* **radarr-sonarr:** add option to tag existing media ([a87ab25](https://github.com/LJAM96/agregarr/commit/a87ab2557d3f9f17bcb07a6376cc12fabc77c02d)), closes [#248](https://github.com/LJAM96/agregarr/issues/248)
+* **tags:** tags can now be created directly in agregarr ([f7083d7](https://github.com/LJAM96/agregarr/commit/f7083d760b9b48a957d7bb354686a8446722dbf6))
+* **tautulli:** add 'Most Watched' collection by Play Count or Watch Duration ([9b0d319](https://github.com/LJAM96/agregarr/commit/9b0d319102e050077a669ee85750b14c545c6de5)), closes [#426](https://github.com/LJAM96/agregarr/issues/426)
+* **trakt:** add Trakt watchlist support (via OAuth) ([8b1d1c6](https://github.com/LJAM96/agregarr/commit/8b1d1c67a5cd997bbd8228b904f84d5d0c846a84)), closes [#377](https://github.com/LJAM96/agregarr/issues/377)
+
+
+### Performance Improvements
+
+* **overlays:** batch composite all template overlays in single render pass ([def2716](https://github.com/LJAM96/agregarr/commit/def271603f63bd8fac27b3d9787e5a4995d92f35))
+
 # [2.3.0](https://github.com/LJAM96/agregarr/compare/v2.2.1...v2.3.0) (2026-02-11)
 
 
