@@ -25,6 +25,33 @@
 * **workflow:** revert switch to QEMU due to user request ([c720fe1](https://github.com/LJAM96/agregarr/commit/c720fe1bfadede77cac53280d95710bace153a9e))
 * **workflow:** switch to QEMU for ARM64 builds ([733b5d9](https://github.com/LJAM96/agregarr/commit/733b5d9435133c259595e2bd50b6019da764b797))
 
+# [2.3.0](https://github.com/LJAM96/agregarr/compare/v2.2.1...v2.3.0) (2026-02-11)
+
+
+### Bug Fixes
+
+* **ci:** convert repository name to lowercase for Docker registry ([7c3478c](https://github.com/LJAM96/agregarr/commit/7c3478cbada0d9fe16932c440b43c1b80f953723))
+* **ci:** properly capture semantic-release outputs for Docker build ([01a5ea0](https://github.com/LJAM96/agregarr/commit/01a5ea02cb57fb48d89e7f13528d3ffa4f675d9c))
+* **ci:** resolve merge conflict in release workflow ([b34e4f9](https://github.com/LJAM96/agregarr/commit/b34e4f9aed37a4306f1c49b64489bbb2a122eb2b))
+* **ci:** revert to QEMU with caching (ARM64 runners not available) ([90fc58b](https://github.com/LJAM96/agregarr/commit/90fc58b401f1f4f0f6ab231d576613de4d77d002))
+* **ci:** update repository URL to fork ([7dd8df9](https://github.com/LJAM96/agregarr/commit/7dd8df9616990a2d7dc4a1fca61e7144501dafde))
+* **ci:** use QEMU with cache to prevent ARM64 build timeouts ([3402969](https://github.com/LJAM96/agregarr/commit/3402969579e6415789859d7b0a7a84c00a763b25))
+* **ci:** use self-hosted runner for develop arm64 builds ([5a01a02](https://github.com/LJAM96/agregarr/commit/5a01a0297d28d2307abcf234af08d62372ca1db1))
+* **collections:** preserve custom URL fields when editing ([83318cd](https://github.com/LJAM96/agregarr/commit/83318cd6bbc88fe826839287ccefdbc556979328))
+* **mdblist:** ensure MDBList collection URL updates are saved ([f670b53](https://github.com/LJAM96/agregarr/commit/f670b53c6f8298aae56c3dd00b7ea8680c2698e2))
+
+
+### Features
+
+* **ci:** allow manual workflow_dispatch trigger for Docker builds ([98436f5](https://github.com/LJAM96/agregarr/commit/98436f5f1e549d7bade52637c57bc1dbe950b5aa))
+* **ci:** use self-hosted ARM64 runner for latest builds ([ccfd76a](https://github.com/LJAM96/agregarr/commit/ccfd76a3c2495979b8e6d3592d6e75f08ebc5279))
+* implement export/import collection list ([c83aed4](https://github.com/LJAM96/agregarr/commit/c83aed4fabdf990335f8f1bbb19598b45b36c632))
+* **mdblist:** add pagination and search url support with IMDB matching ([bd4c195](https://github.com/LJAM96/agregarr/commit/bd4c195e12d89a12eaec362c737556437794ba5e))
+* **mdblist:** fix search URL validation and form population ([6d6491a](https://github.com/LJAM96/agregarr/commit/6d6491aefeccea18bf157341748da100ad10fc9b))
+* **workflow:** remove develop workflow and fix release workflow ([61f01bd](https://github.com/LJAM96/agregarr/commit/61f01bdcc938bec1ecdf41672031eefa0c20b98e))
+* **workflow:** revert switch to QEMU due to user request ([c720fe1](https://github.com/LJAM96/agregarr/commit/c720fe1bfadede77cac53280d95710bace153a9e))
+* **workflow:** switch to QEMU for ARM64 builds ([733b5d9](https://github.com/LJAM96/agregarr/commit/733b5d9435133c259595e2bd50b6019da764b797))
+
 ## [2.8.1](https://github.com/LJAM96/agregarr/compare/v2.8.0...v2.8.1) (2026-01-11)
 
 ## [2.2.1](https://github.com/agregarr/agregarr/compare/v2.2.0...v2.2.1) (2026-01-15)
