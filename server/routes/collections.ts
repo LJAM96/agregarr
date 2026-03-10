@@ -134,15 +134,31 @@ export function validateExternalUrl(
           };
         }
         break;
-      case 'mdblist':
-        if (!urlObj.pathname.match(/^\/lists\/[^/]+\/[^/?]+\/?$/)) {
+      case 'mdblist': {
+        const isUserList = urlObj.pathname.match(/^\/lists\/[^/]+\/[^/?]+\/?$/); // e.g. /lists/username/list-name
+        const isIdList = urlObj.pathname.match(
+          /^\/lists\/(?:external\/)?\d+\/?$/
+        ); // e.g. /lists/123456 or /lists/external/123456
+        const isSearchPage = urlObj.pathname.match(/^\/(shows|movies)\/?$/); // e.g. /shows/ or /movies/
+
+        if (!isUserList && !isIdList && !isSearchPage) {
           return {
             isValid: false,
             error:
-              'Invalid MDBList list URL format. Expected: https://mdblist.com/lists/username/listname',
+              'Invalid MDBList URL format. Expected: https://mdblist.com/lists/username/listname or https://mdblist.com/(shows|movies)/?q=...',
           };
         }
+
+        // Search URLs must preserve their query string (the query params ARE the search).
+        if (isSearchPage && urlObj.search) {
+          return {
+            isValid: true,
+            sanitizedUrl: `${urlObj.protocol}//${urlObj.hostname}${urlObj.pathname}${urlObj.search}`,
+          };
+        }
+
         break;
+      }
       case 'letterboxd':
         if (
           !urlObj.pathname.match(/^\/[^/]+\/list\/[^/?]+\/?$/) &&

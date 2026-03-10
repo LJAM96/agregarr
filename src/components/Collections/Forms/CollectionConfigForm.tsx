@@ -796,6 +796,13 @@ const CollectionFormConfigForm = ({
       otherwise: (schema) => schema,
     }),
 
+    mdblistCustomListUrl: Yup.string().when(['type', 'subtype'], {
+      is: (type: string, subtype: string) =>
+        type === 'mdblist' && (subtype === 'custom' || subtype === 'search'),
+      then: (schema) => schema.required('MDBList URL is required'),
+      otherwise: (schema) => schema,
+    }),
+
     maxItems: Yup.number()
       .min(1, intl.formatMessage(messages.validationMaxItemsMin))
       .max(9999, intl.formatMessage(messages.validationMaxItemsMax)),
@@ -1862,7 +1869,9 @@ const CollectionFormConfigForm = ({
                     existingConfig.traktCustomListUrl ||
                     existingConfig.tmdbCustomCollectionUrl ||
                     existingConfig.imdbCustomListUrl ||
-                    existingConfig.letterboxdCustomListUrl,
+                    existingConfig.letterboxdCustomListUrl ||
+                    existingConfig.mdblistCustomListUrl ||
+                    existingConfig.anilistCustomListUrl,
                   customDays: existingConfig.customDays,
                   minimumPlays: existingConfig.minimumPlays,
                   networksCountry: existingConfig.networksCountry,
@@ -2782,7 +2791,7 @@ const CollectionFormConfigForm = ({
                                 ].includes(values.subtype) ||
                                 values.timePeriod) &&
                               // For custom types, show after title is fetched OR when editing existing config with a name
-                              (values.subtype !== 'custom' ||
+                              (!['custom', 'search'].includes(values.subtype) ||
                                 (values.type === 'trakt' &&
                                   values.subtype === 'custom' &&
                                   (fetchedTitles.trakt || config?.name)) ||
@@ -2796,15 +2805,20 @@ const CollectionFormConfigForm = ({
                                   values.subtype === 'custom' &&
                                   (fetchedTitles.letterboxd || config?.name)) ||
                                 (values.type === 'mdblist' &&
-                                  values.subtype === 'custom' &&
+                                  ['custom', 'search'].includes(
+                                    values.subtype
+                                  ) &&
                                   (fetchedTitles.mdblist || config?.name)) ||
                                 (values.type === 'anilist' &&
                                   values.subtype === 'custom' &&
                                   (fetchedTitles.anilist || config?.name)))
                           )}
                           detectedMediaType={(() => {
-                            // Return detected media type for custom lists
-                            if (values.subtype === 'custom') {
+                            // Return detected media type for custom/search lists
+                            if (
+                              values.subtype === 'custom' ||
+                              values.subtype === 'search'
+                            ) {
                               return detectedMediaTypes?.[
                                 values.type as keyof typeof detectedMediaTypes
                               ];
@@ -2857,8 +2871,11 @@ const CollectionFormConfigForm = ({
                             .tmdbCustomCollectionUrl) &&
                         (values.type !== 'imdb' ||
                           values.subtype !== 'custom' ||
+                          (values as CollectionFormConfig).imdbCustomListUrl) &&
+                        (values.type !== 'mdblist' ||
+                          !['custom', 'search'].includes(values.subtype) ||
                           (values as CollectionFormConfig)
-                            .imdbCustomListUrl) && (
+                            .mdblistCustomListUrl) && (
                           <>
                             {/* Collection Title Template */}
                             <div className="form-row">

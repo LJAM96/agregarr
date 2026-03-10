@@ -86,11 +86,12 @@ class MDBListAPI {
           throw error;
         }
 
-        // Check if it's a retryable error (5xx or network errors)
+        // Check if it's a retryable error (5xx, 429 rate-limit, or network errors)
         const isAxiosError = axios.isAxiosError(error);
         const status = isAxiosError ? error.response?.status : undefined;
         const isRetryable =
-          (status !== undefined && status >= 500) || !isAxiosError;
+          (status !== undefined && (status >= 500 || status === 429)) ||
+          !isAxiosError;
 
         if (!isRetryable) {
           throw error;
@@ -473,16 +474,18 @@ class MDBListAPI {
    * Parse a MDBList URL to extract useful information
    */
   public parseListUrl(url: string): {
-    type: 'user' | 'list' | 'external';
+    type: 'user' | 'list' | 'external' | 'search';
     username?: string;
     listName?: string;
     listId?: number;
+    searchUrl?: string;
   } | null {
     try {
       // Expected formats:
       // - https://mdblist.com/lists/123456
       // - https://mdblist.com/lists/username/list-name
       // - https://mdblist.com/lists/external/12345
+      // - https://mdblist.com/shows/?q=... or https://mdblist.com/movies/?q=...
 
       const listByIdMatch = url.match(/mdblist\.com\/lists\/(\d+)/);
       const listByNameMatch = url.match(
@@ -508,6 +511,16 @@ class MDBListAPI {
           username: listByNameMatch[1],
           listName: listByNameMatch[2],
         };
+      } else if (
+        url.includes('/?q=') ||
+        url.includes('/?s=') ||
+        url.includes('/?q_title=') ||
+        url.includes('/search')
+      ) {
+        return {
+          type: 'search',
+          searchUrl: url,
+        };
       }
 
       return null;
@@ -521,6 +534,220 @@ class MDBListAPI {
         url,
       });
       return null;
+    }
+  }
+
+  /**
+   * Scrape items from a MDBList search URL (e.g. /shows/?q=... or /movies/?q=...).
+   *
+   * MDBList does not expose a search API, so we scrape the HTML pages using
+   * JSDOM and a browser-like User-Agent. The method handles pagination via the
+   * `q_current_page` / `q_page_next` query-param pattern used by MDBList and
+   * stops automatically when a page returns no new items or the safety cap is
+   * reached (MAX_PAGES = 20, ~1 000 items).
+   */
+  public async getSearchListItems(searchUrl: string): Promise<MDBListResponse> {
+    try {
+      const { JSDOM } = await import('jsdom');
+
+      // MDBList search pages require a browser-like User-Agent to return HTML content.
+      const MDBLIST_UA =
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+      interface SearchItem {
+        id: string;
+        title: string;
+        year?: number;
+        type: 'movie' | 'show';
+        rank: number;
+        imdb_id?: string;
+      }
+
+      const items: SearchItem[] = [];
+
+      // Derive media type from the URL path (/movies/ → movie, anything else → show).
+      const urlMediaType: 'movie' | 'show' = searchUrl.includes('/movies/')
+        ? 'movie'
+        : 'show';
+
+      /** Extract SearchItems from a parsed HTML page. */
+      const extractItems = (
+        dom: InstanceType<typeof JSDOM>,
+        rankOffset: number
+      ): SearchItem[] => {
+        const doc = dom.window.document;
+        const cards = doc.querySelectorAll('div.card');
+        const pageItems: SearchItem[] = [];
+
+        cards.forEach((card: Element, idx: number) => {
+          const header = card.querySelector(
+            '.movie-title, .show-title, .header'
+          );
+          if (!header) return;
+
+          const titleText = header.textContent?.trim() ?? '';
+          const yearMatch = titleText.match(/\((\d{4})\)$/);
+          const title = yearMatch
+            ? titleText.replace(yearMatch[0], '').trim()
+            : titleText;
+          const year = yearMatch ? parseInt(yearMatch[1], 10) : undefined;
+
+          const link = card.querySelector(
+            'a[href^="/movie/"], a[href^="/show/"]'
+          );
+          const href = link?.getAttribute('href');
+
+          const imdbLink = card.querySelector('a[href*="imdb.com/title/"]');
+          const imdb_id =
+            imdbLink?.getAttribute('href')?.match(/tt\d+/)?.[0] ?? undefined;
+
+          if (!title) return;
+
+          let itemType: 'movie' | 'show' = urlMediaType;
+          if (href) {
+            itemType = href.includes('/movie/') ? 'movie' : 'show';
+          }
+
+          pageItems.push({
+            id: imdb_id ?? `mdblist-${title}-${year ?? 'unk'}`,
+            title,
+            year,
+            type: itemType,
+            rank: rankOffset + idx + 1,
+            ...(imdb_id ? { imdb_id } : {}),
+          });
+        });
+
+        return pageItems;
+      };
+
+      // Fetch and parse the first page.
+      logger.debug(`[MDBList] Scraping search page 1: ${searchUrl}`, {
+        label: 'MDBList API',
+      });
+      const r1 = await axios.get(searchUrl, {
+        headers: { 'User-Agent': MDBLIST_UA },
+        timeout: 30000,
+      });
+      const page1Items = extractItems(new JSDOM(r1.data as string), 0);
+
+      if (page1Items.length === 0) {
+        logger.warn('[MDBList] No items found on first page of search', {
+          label: 'MDBList API',
+        });
+        return { movies: [], shows: [] };
+      }
+
+      items.push(...page1Items);
+      logger.debug(`[MDBList] Page 1 yielded ${page1Items.length} items`, {
+        label: 'MDBList API',
+      });
+
+      // Paginate via q_current_page / q_page_next. Cap at MAX_PAGES to avoid
+      // unbounded requests if MDBList's pagination loops or never terminates.
+      const MAX_PAGES = 20;
+
+      for (let pageIdx = 0; pageIdx < MAX_PAGES; pageIdx++) {
+        const nextUrl = new URL(searchUrl);
+        nextUrl.searchParams.set('q_current_page', String(pageIdx));
+        nextUrl.searchParams.set('q_page_next', '1');
+
+        logger.debug(
+          `[MDBList] Scraping page ${pageIdx + 2}: ${nextUrl.toString()}`,
+          { label: 'MDBList API' }
+        );
+
+        try {
+          const rNext = await axios.get(nextUrl.toString(), {
+            headers: { 'User-Agent': MDBLIST_UA },
+            timeout: 30000,
+          });
+          const nextItems = extractItems(
+            new JSDOM(rNext.data as string),
+            items.length
+          );
+
+          if (nextItems.length === 0) {
+            logger.debug('[MDBList] Empty page — pagination complete.', {
+              label: 'MDBList API',
+            });
+            break;
+          }
+
+          // If the first item of the next page matches one we already have,
+          // MDBList has looped back to the start — stop immediately.
+          const alreadyExists = items.some(
+            (i) =>
+              i.title === nextItems[0].title && i.year === nextItems[0].year
+          );
+          if (alreadyExists) {
+            logger.debug(
+              '[MDBList] Duplicate first item detected — pagination complete.',
+              { label: 'MDBList API' }
+            );
+            break;
+          }
+
+          items.push(...nextItems);
+          logger.debug(
+            `[MDBList] Page ${pageIdx + 2} yielded ${
+              nextItems.length
+            } items. Total: ${items.length}`,
+            { label: 'MDBList API' }
+          );
+
+          // Brief pause to respect MDBList rate limits.
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        } catch (pageError: unknown) {
+          logger.error(
+            `[MDBList] Error fetching page ${pageIdx + 2}: ${
+              pageError instanceof Error ? pageError.message : String(pageError)
+            }`,
+            { label: 'MDBList API' }
+          );
+          break;
+        }
+      }
+
+      // Map scraped items into the standard MDBListResponse shape.
+      const movies: MDBListMovie[] = [];
+      const shows: MDBListShow[] = [];
+
+      for (const item of items) {
+        const base = {
+          id: 0, // No TMDB ID from scraping — IMDB fallback will be used
+          rank: item.rank,
+          adult: 0,
+          title: item.title,
+          imdb_id: item.imdb_id ?? '',
+          tvdb_id: item.type === 'show' ? 0 : (null as unknown as number),
+          language: 'en',
+          mediatype:
+            item.type === 'movie' ? ('movie' as const) : ('show' as const),
+          release_year: item.year ?? 0,
+          spoken_language: 'en',
+        };
+        if (item.type === 'movie') {
+          movies.push(base as MDBListMovie);
+        } else {
+          shows.push(base as MDBListShow);
+        }
+      }
+
+      logger.debug(
+        `[MDBList] Search scrape complete — movies: ${movies.length}, shows: ${shows.length}`,
+        { label: 'MDBList API' }
+      );
+
+      return { movies, shows };
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      logger.error('Failed to scrape MDBList search URL', {
+        label: 'MDBList API',
+        errorMessage: msg,
+        searchUrl,
+      });
+      throw new Error(`[MDBList] Failed to scrape search URL: ${msg}`);
     }
   }
 
@@ -541,7 +768,7 @@ class MDBListAPI {
 
       if (!parsedUrl) {
         throw new Error(
-          'Invalid MDBList URL format. Expected: https://mdblist.com/lists/{id} or https://mdblist.com/lists/{username}/{list-name}'
+          'Invalid MDBList URL format. Expected: https://mdblist.com/lists/{id} or https://mdblist.com/lists/{username}/{list-name} or https://mdblist.com/(shows|movies)/?q=...'
         );
       }
 
@@ -560,6 +787,8 @@ class MDBListAPI {
       } else if (parsedUrl.type === 'external' && parsedUrl.listId) {
         // External lists use the same endpoint as regular lists
         return await this.getListItems(parsedUrl.listId, options);
+      } else if (parsedUrl.type === 'search' && parsedUrl.searchUrl) {
+        return await this.getSearchListItems(parsedUrl.searchUrl);
       } else {
         throw new Error('Unable to determine list type from URL');
       }

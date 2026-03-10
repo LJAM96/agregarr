@@ -646,6 +646,30 @@ fetchTitleRoutes.get('/', isAuthenticated(), async (req, res) => {
             return res.end();
           }
 
+          // Handle search URLs: derive title from query params, detect media type
+          // from the URL path, and skip the expensive getCustomList call.
+          if (parsedUrl.type === 'search') {
+            title = 'MDBList Search Results';
+            try {
+              const urlObj = new URL(sanitizedUrl);
+              const query =
+                urlObj.searchParams.get('q') ||
+                urlObj.searchParams.get('q_title');
+              if (query) {
+                title = `MDBList Search: ${query}`;
+              }
+            } catch (_) {
+              // ignore URL parse errors, keep default title
+            }
+            mediaType = sanitizedUrl.includes('/movies/')
+              ? 'movie'
+              : sanitizedUrl.includes('/shows/')
+              ? 'tv'
+              : 'both';
+            // No need to call getCustomList for search URLs
+            break;
+          }
+
           // Get list metadata to extract title
           // Try two approaches: first try getting by username (for other users' public lists),
           // then fallback to getting own lists (for private lists or when username endpoint fails)

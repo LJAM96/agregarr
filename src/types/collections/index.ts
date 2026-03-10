@@ -396,6 +396,8 @@ export interface CollectionFormConfig {
   readonly imdbCustomListUrl?: string; // Custom IMDb list URL
   // Letterboxd custom list fields
   readonly letterboxdCustomListUrl?: string; // Custom Letterboxd list URL
+  // MDBList custom/search list fields
+  readonly mdblistCustomListUrl?: string; // Custom or search MDBList URL
   // Networks fields
   readonly networksCountry?: string; // Selected country for Networks collections
   // AniList custom list fields
@@ -607,6 +609,7 @@ export interface CollectionConfigCreateRequest {
   readonly tmdbAdvancedFilters?: Record<string, unknown>;
   readonly imdbCustomListUrl?: string;
   readonly letterboxdCustomListUrl?: string;
+  readonly mdblistCustomListUrl?: string;
   readonly networksCountry?: string;
   readonly anilistCustomListUrl?: string;
   readonly radarrInstanceId?: number;
@@ -755,6 +758,7 @@ export const toCollectionCreateRequest = (
       | undefined,
     imdbCustomListUrl: config.imdbCustomListUrl,
     letterboxdCustomListUrl: config.letterboxdCustomListUrl,
+    mdblistCustomListUrl: config.mdblistCustomListUrl,
     networksCountry: config.networksCountry,
     anilistCustomListUrl: config.anilistCustomListUrl,
     radarrInstanceId: config.radarrInstanceId,

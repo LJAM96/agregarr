@@ -404,15 +404,21 @@ const CustomUrlSection = ({
     );
   }
 
-  // Custom MDBList List URL
-  if (values.type === 'mdblist' && values.subtype === 'custom') {
+  // Custom MDBList List URL (custom list or search URL)
+  if (
+    values.type === 'mdblist' &&
+    (values.subtype === 'custom' || values.subtype === 'search')
+  ) {
+    const isSearch = values.subtype === 'search';
     return (
       <div>
         <label
           htmlFor="mdblistCustomListUrl"
           className="mb-2 block text-sm text-gray-300"
         >
-          {intl.formatMessage(messages.customMdblistListUrl)}{' '}
+          {isSearch
+            ? 'MDBList Search URL'
+            : intl.formatMessage(messages.customMdblistListUrl)}{' '}
           <span className="text-red-500">*</span>
         </label>
         <div className="flex gap-2">
@@ -420,7 +426,11 @@ const CustomUrlSection = ({
             type="url"
             id="mdblistCustomListUrl"
             name="mdblistCustomListUrl"
-            placeholder="https://mdblist.com/lists/username/list-name"
+            placeholder={
+              isSearch
+                ? 'https://mdblist.com/shows/?q=...'
+                : 'https://mdblist.com/lists/username/list-name'
+            }
             className="flex-1 rounded-md border border-stone-500 bg-stone-700 px-3 py-2 text-white placeholder-gray-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
           />
           {fetchMdblistTitle && (
@@ -442,7 +452,9 @@ const CustomUrlSection = ({
           className="mt-1 text-sm text-red-500"
         />
         <p className="mt-1 text-xs text-gray-400">
-          {intl.formatMessage(messages.mdblistUrlExample)}
+          {isSearch
+            ? 'Example: https://mdblist.com/shows/?q=breaking bad'
+            : intl.formatMessage(messages.mdblistUrlExample)}
         </p>
       </div>
     );

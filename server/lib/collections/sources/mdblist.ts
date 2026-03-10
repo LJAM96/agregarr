@@ -209,10 +209,10 @@ export class MDBListCollectionSync extends BaseCollectionSync<'mdblist'> {
     const mediaType = getCollectionMediaType(config);
 
     try {
-      if (listType !== 'custom') {
+      if (listType !== 'custom' && listType !== 'search') {
         throw this.createSyncError(
           CollectionSyncErrorType.CONFIGURATION_ERROR,
-          `MDBList only supports custom lists. Invalid subtype: ${config.subtype}`
+          `MDBList only supports custom and search lists. Invalid subtype: ${config.subtype}`
         );
       }
 
@@ -223,23 +223,55 @@ export class MDBListCollectionSync extends BaseCollectionSync<'mdblist'> {
         );
       }
 
-      // Strip query parameters from URL before calling MDBList API
+      // Search lists require query parameters; standard custom lists strip them.
       const cleanUrl =
-        config.mdblistCustomListUrl?.split('?')[0] ||
-        config.mdblistCustomListUrl;
+        config.subtype === 'search'
+          ? config.mdblistCustomListUrl
+          : config.mdblistCustomListUrl?.split('?')[0] ||
+            config.mdblistCustomListUrl;
 
-      const customListData: MDBListResponse = await mdblistClient.getCustomList(
-        cleanUrl,
-        {
-          limit: 9999,
+      const limit = 1000;
+      let offset = 0;
+      let hasMore = true;
+      let pageCount = 0;
+
+      while (hasMore) {
+        pageCount++;
+        logger.debug(
+          `Fetching MDBList page ${pageCount} (offset: ${offset}, limit: ${limit})`,
+          { label: 'MDBList Collections' }
+        );
+
+        const customListData: MDBListResponse =
+          await mdblistClient.getCustomList(cleanUrl, { limit, offset });
+
+        const movieCount = customListData.movies?.length ?? 0;
+        const showCount = customListData.shows?.length ?? 0;
+        const totalFetched = movieCount + showCount;
+
+        // Convert to standardized format
+        const targetItems: (MDBListMovie | MDBListShow)[] =
+          mediaType === 'movie' ? customListData.movies : customListData.shows;
+
+        if (targetItems && targetItems.length > 0) {
+          mdblistData.push(...targetItems.map((item) => ({ item, mediaType })));
         }
-      );
 
-      // Convert to standardized format
-      const targetItems: (MDBListMovie | MDBListShow)[] =
-        mediaType === 'movie' ? customListData.movies : customListData.shows;
+        // Fewer results than the limit means we've reached the last page.
+        if (totalFetched < limit) {
+          hasMore = false;
+        } else {
+          offset += limit;
+        }
 
-      mdblistData.push(...targetItems.map((item) => ({ item, mediaType })));
+        // Safety break to prevent infinite loops on unexpected API behaviour.
+        if (pageCount > 100) {
+          logger.warn('MDBList pagination forced break after 100 pages', {
+            label: 'MDBList Collections',
+          });
+          break;
+        }
+      }
 
       return mdblistData;
     } catch (error) {
@@ -309,6 +341,7 @@ export class MDBListCollectionSync extends BaseCollectionSync<'mdblist'> {
     // Extract all TMDB IDs and prepare lookup data
     const mdblistLookups: {
       tmdbId: number;
+      imdbId?: string;
       mediaType: 'movie' | 'tv';
       title: string;
       year?: number;
@@ -318,10 +351,12 @@ export class MDBListCollectionSync extends BaseCollectionSync<'mdblist'> {
     for (let index = 0; index < sourceData.length; index++) {
       const sourceItem = sourceData[index];
       try {
-        // MDBList items have id (which is TMDB ID), title, and mediatype
+        // MDBList items have id (TMDB ID), imdb_id, title, and mediatype.
+        // Scraped search items have id=0 but a valid imdb_id.
         const item = sourceItem.item;
 
-        if (!item.id) {
+        // Skip only if we have neither a TMDB ID nor an IMDB ID.
+        if (!item.id && !item.imdb_id) {
           continue;
         }
 
@@ -330,10 +365,11 @@ export class MDBListCollectionSync extends BaseCollectionSync<'mdblist'> {
 
         mdblistLookups.push({
           tmdbId: item.id,
+          imdbId: item.imdb_id || undefined,
           mediaType: itemMediaType as 'movie' | 'tv',
           title: item.title,
           year: item.release_year,
-          originalPosition: index + 1, // 1-based position
+          originalPosition: index + 1,
         });
       } catch (error) {
         logger.warn(`Failed to process MDBList item: ${error}`, {
@@ -364,11 +400,11 @@ export class MDBListCollectionSync extends BaseCollectionSync<'mdblist'> {
     // Use direct Plex queries instead of Media table
     let plexLookup: Map<string, PlexLookupResult> = new Map();
 
+    const targetLibraryId = Array.isArray(config.libraryId)
+      ? config.libraryId[0]
+      : config.libraryId;
+
     if (plexClient) {
-      // Pass target library ID to limit search scope to only the collection's target library
-      const targetLibraryId = Array.isArray(config.libraryId)
-        ? config.libraryId[0]
-        : config.libraryId;
       plexLookup = await findPlexItemsByTmdbIds(
         plexClient,
         mdblistLookups,
@@ -382,11 +418,61 @@ export class MDBListCollectionSync extends BaseCollectionSync<'mdblist'> {
       });
     }
 
-    // Process items using the Plex lookup map
-    for (const lookup of mdblistLookups) {
-      const key = `${lookup.tmdbId}-${lookup.mediaType}`;
+    // Build an IMDB → Plex item map for items that have tmdbId=0 (scraped search results).
+    // We do this lazily — only when at least one lookup item actually needs it.
+    const needsImdbFallback = mdblistLookups.some(
+      (l) => l.tmdbId === 0 && l.imdbId
+    );
 
-      const plexItem = plexLookup.get(key);
+    const imdbLookup = new Map<string, PlexLookupResult>();
+
+    if (needsImdbFallback && libraryCache) {
+      for (const [libraryKey, items] of Object.entries(libraryCache)) {
+        if (targetLibraryId && libraryKey !== targetLibraryId) continue;
+
+        for (const item of items as {
+          ratingKey: string;
+          title: string;
+          addedAt?: number;
+          originallyAvailableAt?: string;
+          Guid?: { id?: string }[];
+        }[]) {
+          if (!item.Guid) continue;
+          for (const guid of item.Guid) {
+            const match = guid.id?.match(/imdb:\/\/(tt\d+)/);
+            if (match) {
+              imdbLookup.set(match[1], {
+                ratingKey: item.ratingKey,
+                title: item.title,
+                libraryKey,
+                addedAt: item.addedAt,
+                releaseDate: item.originallyAvailableAt
+                  ? new Date(item.originallyAvailableAt).getTime()
+                  : undefined,
+              });
+            }
+          }
+        }
+      }
+
+      logger.debug(`Built IMDB lookup map with ${imdbLookup.size} entries`, {
+        label: 'MDBList Collections',
+      });
+    }
+
+    // Process items using the Plex lookup map (with IMDB fallback for search items).
+    for (const lookup of mdblistLookups) {
+      let plexItem: PlexLookupResult | undefined;
+
+      // Primary: TMDB lookup.
+      if (lookup.tmdbId > 0) {
+        plexItem = plexLookup.get(`${lookup.tmdbId}-${lookup.mediaType}`);
+      }
+
+      // Fallback: IMDB lookup for scraped items where TMDB ID is unavailable.
+      if (!plexItem && lookup.imdbId) {
+        plexItem = imdbLookup.get(lookup.imdbId);
+      }
 
       if (plexItem) {
         const mappedItem = {
@@ -399,7 +485,7 @@ export class MDBListCollectionSync extends BaseCollectionSync<'mdblist'> {
           releaseDate: plexItem.releaseDate,
           metadata: {
             libraryKey: plexItem.libraryKey,
-            originalPosition: lookup.originalPosition, // CRITICAL: Preserve source order for multi-source interleaving
+            originalPosition: lookup.originalPosition,
           },
         };
 
@@ -496,14 +582,14 @@ export class MDBListCollectionSync extends BaseCollectionSync<'mdblist'> {
     }
 
     // Only custom lists are supported
-    return config.subtype === 'custom';
+    // Custom and Search subtypes are both supported
+    return config.subtype === 'custom' || config.subtype === 'search';
   }
 
   private getListTypeFromSubtype(subtype: string | undefined): string {
     if (!subtype) return 'custom';
-
-    // Only custom lists are supported
-    return subtype === 'custom' ? 'custom' : 'custom';
+    if (subtype === 'search') return 'search';
+    return 'custom';
   }
 
   private async handleAutoRequests(
