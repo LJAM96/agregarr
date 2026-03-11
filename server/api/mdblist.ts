@@ -654,6 +654,16 @@ class MDBListAPI {
         return pageItems;
       };
 
+      /** Returns true when the forward/next button is absent or disabled. */
+      const isLastPage = (html: string): boolean => {
+        // The button spans multiple lines so use dotAll matching on the tag.
+        const match = html.match(
+          /<button[^>]*name="q_page_next"[\s\S]*?<\/button>/
+        );
+        if (!match) return true; // no button → only one page
+        return match[0].includes('disabled');
+      };
+
       // Fetch and parse the first page.
       logger.debug(`[MDBList] Scraping search page 1: ${searchUrl}`, {
         label: 'MDBList API',
@@ -662,7 +672,8 @@ class MDBListAPI {
         headers: scrapeHeaders,
         timeout: 30000,
       });
-      const page1Items = extractItems(new JSDOM(r1.data as string), 0);
+      const page1Html = r1.data as string;
+      const page1Items = extractItems(new JSDOM(page1Html), 0);
 
       if (page1Items.length === 0) {
         logger.warn('[MDBList] No items found on first page of search', {
@@ -676,69 +687,85 @@ class MDBListAPI {
         label: 'MDBList API',
       });
 
-      // Paginate via q_current_page / q_page_next. Cap at MAX_PAGES to avoid
-      // unbounded requests if MDBList's pagination loops or never terminates.
-      const MAX_PAGES = 20;
+      // Stop now if the forward button is already disabled (single page result).
+      if (isLastPage(page1Html)) {
+        logger.debug('[MDBList] Single page result — pagination complete.', {
+          label: 'MDBList API',
+        });
+      } else {
+        // Paginate: MDBList advances by submitting q_current_page=N&q_page_next=1
+        // where N is the current page index (0-based). Cap at MAX_PAGES as a safety net.
+        const MAX_PAGES = 20;
 
-      for (let pageIdx = 0; pageIdx < MAX_PAGES; pageIdx++) {
-        const nextUrl = new URL(searchUrl);
-        nextUrl.searchParams.set('q_current_page', String(pageIdx));
-        nextUrl.searchParams.set('q_page_next', '1');
+        for (let pageIdx = 0; pageIdx < MAX_PAGES; pageIdx++) {
+          const nextUrl = new URL(searchUrl);
+          nextUrl.searchParams.set('q_current_page', String(pageIdx));
+          nextUrl.searchParams.set('q_page_next', '1');
 
-        logger.debug(
-          `[MDBList] Scraping page ${pageIdx + 2}: ${nextUrl.toString()}`,
-          { label: 'MDBList API' }
-        );
-
-        try {
-          const rNext = await scrapeClient.get(nextUrl.toString(), {
-            headers: scrapeHeaders,
-            timeout: 30000,
-          });
-          const nextItems = extractItems(
-            new JSDOM(rNext.data as string),
-            items.length
-          );
-
-          if (nextItems.length === 0) {
-            logger.debug('[MDBList] Empty page — pagination complete.', {
-              label: 'MDBList API',
-            });
-            break;
-          }
-
-          // If the first item of the next page matches one we already have,
-          // MDBList has looped back to the start — stop immediately.
-          const alreadyExists = items.some(
-            (i) =>
-              i.title === nextItems[0].title && i.year === nextItems[0].year
-          );
-          if (alreadyExists) {
-            logger.debug(
-              '[MDBList] Duplicate first item detected — pagination complete.',
-              { label: 'MDBList API' }
-            );
-            break;
-          }
-
-          items.push(...nextItems);
           logger.debug(
-            `[MDBList] Page ${pageIdx + 2} yielded ${
-              nextItems.length
-            } items. Total: ${items.length}`,
+            `[MDBList] Scraping page ${pageIdx + 2}: ${nextUrl.toString()}`,
             { label: 'MDBList API' }
           );
 
           // Brief pause to respect MDBList rate limits.
           await new Promise((resolve) => setTimeout(resolve, 1000));
-        } catch (pageError: unknown) {
-          logger.error(
-            `[MDBList] Error fetching page ${pageIdx + 2}: ${
-              pageError instanceof Error ? pageError.message : String(pageError)
-            }`,
-            { label: 'MDBList API' }
-          );
-          break;
+
+          try {
+            const rNext = await scrapeClient.get(nextUrl.toString(), {
+              headers: scrapeHeaders,
+              timeout: 30000,
+            });
+            const nextHtml = rNext.data as string;
+            const nextItems = extractItems(
+              new JSDOM(nextHtml),
+              items.length
+            );
+
+            if (nextItems.length === 0) {
+              logger.debug('[MDBList] Empty page — pagination complete.', {
+                label: 'MDBList API',
+              });
+              break;
+            }
+
+            // If the first item of this page already exists we've looped back.
+            const alreadyExists = items.some(
+              (i) =>
+                i.title === nextItems[0].title && i.year === nextItems[0].year
+            );
+            if (alreadyExists) {
+              logger.debug(
+                '[MDBList] Duplicate first item detected — pagination complete.',
+                { label: 'MDBList API' }
+              );
+              break;
+            }
+
+            items.push(...nextItems);
+            logger.debug(
+              `[MDBList] Page ${pageIdx + 2} yielded ${nextItems.length} items. Total: ${items.length}`,
+              { label: 'MDBList API' }
+            );
+
+            // Primary stop condition: forward button is disabled on this page.
+            if (isLastPage(nextHtml)) {
+              logger.debug(
+                '[MDBList] Forward button disabled — pagination complete.',
+                { label: 'MDBList API' }
+              );
+              break;
+            }
+          } catch (pageError: unknown) {
+            logger.error(
+              `[MDBList] Error fetching page ${pageIdx + 2}: ${
+                pageError instanceof Error
+                  ? pageError.message
+                  : String(pageError)
+              }`,
+              { label: 'MDBList API' }
+            );
+            break;
+          }
         }
       }
 
