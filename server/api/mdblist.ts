@@ -62,10 +62,8 @@ export interface MDBListUserInfo {
 
 class MDBListAPI {
   private axios: AxiosInstance;
-  private sessionCookie?: string;
 
-  constructor(apiKey: string, sessionCookie?: string) {
-    this.sessionCookie = sessionCookie;
+  constructor(apiKey: string) {
     this.axios = axios.create({
       baseURL: 'https://api.mdblist.com',
       params: {
@@ -552,8 +550,9 @@ class MDBListAPI {
     try {
       const { JSDOM } = await import('jsdom');
 
-      // MDBList search pages require a browser-like User-Agent and a session
-      // cookie (csrftoken + sessionid) to access filter/search pages.
+      // MDBList search pages require a browser-like User-Agent and the
+      // X-Requested-With header to return HTML results (without it the
+      // server returns 403 even for publicly-accessible search pages).
       const MDBLIST_UA =
         'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
@@ -563,9 +562,7 @@ class MDBListAPI {
           'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9',
         Referer: 'https://mdblist.com/',
-        ...(this.sessionCookie
-          ? { Cookie: this.sessionCookie }
-          : {}),
+        'X-Requested-With': 'XMLHttpRequest',
       };
 
       interface SearchItem {

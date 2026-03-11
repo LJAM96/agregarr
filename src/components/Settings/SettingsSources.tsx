@@ -77,9 +77,6 @@ const messages = defineMessages({
   mdblistSettingsDescription:
     'Configure your MDBList API key to enable MDBList-based collections with user lists and top lists.',
   mdblistApiKey: 'MDBList API Key',
-  mdblistSessionCookie: 'MDBList Session Cookie',
-  mdblistSessionCookieTip:
-    'Required for MDBList Search List collections. Log in to mdblist.com, open DevTools → Application → Cookies, and copy the full cookie string (e.g. <code>csrftoken=xxx; sessionid=yyy</code>).',
   toastMdblistSettingsSuccess: 'MDBList settings saved successfully!',
   toastMdblistSettingsFailure:
     'Something went wrong while saving MDBList settings.',
@@ -838,7 +835,6 @@ const SettingsSources = ({ onComplete }: SettingsSourcesProps) => {
       <Formik
         initialValues={{
           mdblistApiKey: dataMdblist?.apiKey,
-          mdblistSessionCookie: dataMdblist?.sessionCookie,
         }}
         validationSchema={MdblistSettingsSchema}
         enableReinitialize
@@ -846,7 +842,6 @@ const SettingsSources = ({ onComplete }: SettingsSourcesProps) => {
           try {
             await axios.post('/api/v1/settings/mdblist', {
               apiKey: values.mdblistApiKey,
-              sessionCookie: values.mdblistSessionCookie,
             });
             addToast(intl.formatMessage(messages.toastMdblistSettingsSuccess), {
               appearance: 'success',
@@ -950,29 +945,6 @@ const SettingsSources = ({ onComplete }: SettingsSourcesProps) => {
                       as="field"
                       id="mdblistApiKey"
                       name="mdblistApiKey"
-                      autoComplete="one-time-code"
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="form-row">
-                <label htmlFor="mdblistSessionCookie" className="text-label">
-                  {intl.formatMessage(messages.mdblistSessionCookie)}
-                  <span className="label-tip mb-2">
-                    <FormattedMessage
-                      {...messages.mdblistSessionCookieTip}
-                      values={{
-                        code: (chunks) => <code>{chunks}</code>,
-                      }}
-                    />
-                  </span>
-                </label>
-                <div className="form-input-area">
-                  <div className="form-input-field">
-                    <SensitiveInput
-                      as="field"
-                      id="mdblistSessionCookie"
-                      name="mdblistSessionCookie"
                       autoComplete="one-time-code"
                     />
                   </div>
