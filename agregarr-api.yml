@@ -4498,7 +4498,15 @@ components:
           type: array
           items:
             type: string
-          example: ['Resolution', 'Size', 'Source', 'Bitrate', 'DynamicRange', 'AudioCodec']
+          example:
+            [
+              'Resolution',
+              'Size',
+              'Source',
+              'Bitrate',
+              'DynamicRange',
+              'AudioCodec',
+            ]
           description: Ordered list of enabled module names
         separator:
           type: string
@@ -7096,6 +7104,70 @@ paths:
                   error:
                     type: string
                     example: 'Failed to demote collection'
+  /collections/export:
+    get:
+      summary: Export collection configurations
+      description: Downloads all Agregarr collection configurations as a JSON file.
+      tags:
+        - collections
+      responses:
+        '200':
+          description: Collection configurations exported successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version:
+                    type: integer
+                    example: 1
+                  exportedAt:
+                    type: string
+                    format: date-time
+                  collectionConfigs:
+                    type: array
+                    items:
+                      type: object
+  /collections/import:
+    post:
+      summary: Import collection configurations
+      description: Merges imported collection configurations with existing ones, skipping duplicates by ID.
+      tags:
+        - collections
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - collectionConfigs
+              properties:
+                collectionConfigs:
+                  type: array
+                  items:
+                    type: object
+      responses:
+        '200':
+          description: Collections imported successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  imported:
+                    type: integer
+                    example: 5
+                  skipped:
+                    type: integer
+                    example: 2
+                  total:
+                    type: integer
+                    example: 15
+        '400':
+          description: Invalid import data
+        '500':
+          description: Failed to import collections
   /collections/sync:
     get:
       summary: Get collections sync status

@@ -260,6 +260,83 @@ collectionsRoutes.get('/', (_req, res) => {
 });
 
 /**
+ * GET /api/v1/collections/export
+ * Export all collection configurations as a JSON file
+ */
+collectionsRoutes.get('/export', isAuthenticated(), (_req, res) => {
+  const settings = getSettings();
+  const configs = settings.plex.collectionConfigs || [];
+
+  const exportData = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    collectionConfigs: configs,
+  };
+
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename="agregarr-collections-${new Date()
+      .toISOString()
+      .slice(0, 10)}.json"`
+  );
+
+  logger.info('Exporting collection configurations', {
+    label: 'Collections API',
+    count: configs.length,
+  });
+
+  return res.status(200).json(exportData);
+});
+
+/**
+ * POST /api/v1/collections/import
+ * Import collection configurations from JSON, merging with existing (skip duplicates by ID)
+ */
+collectionsRoutes.post('/import', isAuthenticated(), async (req, res) => {
+  try {
+    const { collectionConfigs: incoming } = req.body as {
+      collectionConfigs?: CollectionConfig[];
+    };
+
+    if (!Array.isArray(incoming)) {
+      return res
+        .status(400)
+        .json({
+          error: 'Invalid import data: collectionConfigs must be an array',
+        });
+    }
+
+    const settings = getSettings();
+    const existing = settings.plex.collectionConfigs || [];
+    const existingIds = new Set(existing.map((c) => c.id));
+
+    const newConfigs = incoming.filter((c) => c.id && !existingIds.has(c.id));
+
+    settings.plex.collectionConfigs = [...existing, ...newConfigs];
+    await settings.save();
+
+    logger.info('Imported collection configurations', {
+      label: 'Collections API',
+      imported: newConfigs.length,
+      skipped: incoming.length - newConfigs.length,
+    });
+
+    return res.status(200).json({
+      imported: newConfigs.length,
+      skipped: incoming.length - newConfigs.length,
+      total: settings.plex.collectionConfigs.length,
+    });
+  } catch (err) {
+    logger.error('Failed to import collection configurations', {
+      label: 'Collections API',
+      error: err,
+    });
+    return res.status(500).json({ error: 'Failed to import collections' });
+  }
+});
+
+/**
  * PUT /api/v1/collections/:id/settings
  * Update individual collection settings
  */

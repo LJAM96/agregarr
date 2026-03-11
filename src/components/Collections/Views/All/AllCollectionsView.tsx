@@ -26,6 +26,8 @@ import {
   unlinkCollectionConfig,
 } from '@app/utils/collections/linkingHandlers';
 import {
+  ArrowDownTrayIcon,
+  ArrowUpTrayIcon,
   FunnelIcon,
   PencilIcon,
   PencilSquareIcon,
@@ -37,7 +39,7 @@ import type {
 } from '@server/lib/settings';
 import axios from 'axios';
 import type React from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { defineMessages, useIntl } from 'react-intl';
 import { useToasts } from 'react-toast-notifications';
 import useSWR from 'swr';
@@ -63,6 +65,12 @@ const messages = defineMessages({
   sortType: 'Type',
   sortLibrary: 'Library',
   titleWillUpdate: 'Title will be updated on Collection Sync',
+  exportCollections: 'Export',
+  importCollections: 'Import',
+  importSuccess:
+    'Imported {imported} collections ({skipped} skipped as duplicates)',
+  importError: 'Failed to import collections',
+  importInvalidFile: 'Invalid file: must be a JSON export from Agregarr',
 });
 
 // Interfaces for clean collection data display - no conversion needed
@@ -105,6 +113,10 @@ const AllCollectionsView: React.FC = () => {
 
   // Bulk edit modal state
   const [showBulkEditModal, setShowBulkEditModal] = useState(false);
+
+  // Import state
+  const [isImporting, setIsImporting] = useState(false);
+  const importFileRef = useRef<HTMLInputElement>(null);
 
   // Sorting state
   const [sortType, setSortType] = useState<string>('name-asc');
@@ -152,6 +164,67 @@ const AllCollectionsView: React.FC = () => {
     revalidateCollections();
     revalidateDefaultHubs();
     revalidatePreExisting();
+  };
+
+  const handleExport = async () => {
+    try {
+      const response = await axios.get('/api/v1/collections/export', {
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      const date = new Date().toISOString().slice(0, 10);
+      link.setAttribute('download', `agregarr-collections-${date}.json`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      addToast(intl.formatMessage(messages.importError), {
+        appearance: 'error',
+      });
+    }
+  };
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Reset input so the same file can be re-imported if needed
+    e.target.value = '';
+
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+
+      if (!Array.isArray(parsed.collectionConfigs)) {
+        addToast(intl.formatMessage(messages.importInvalidFile), {
+          appearance: 'error',
+        });
+        return;
+      }
+
+      setIsImporting(true);
+      const { data } = await axios.post('/api/v1/collections/import', {
+        collectionConfigs: parsed.collectionConfigs,
+      });
+
+      addToast(
+        intl.formatMessage(messages.importSuccess, {
+          imported: data.imported,
+          skipped: data.skipped,
+        }),
+        { appearance: 'success' }
+      );
+      revalidateCollections();
+    } catch {
+      addToast(intl.formatMessage(messages.importError), {
+        appearance: 'error',
+      });
+    } finally {
+      setIsImporting(false);
+    }
   };
 
   // Wrapper for saveCollectionConfig to match linking handler signature
@@ -542,6 +615,26 @@ const AllCollectionsView: React.FC = () => {
               <PencilSquareIcon className="mr-1 h-4 w-4" />
               {intl.formatMessage(messages.bulkEdit)}
             </Button>
+            <Button buttonType="default" buttonSize="sm" onClick={handleExport}>
+              <ArrowDownTrayIcon className="mr-1 h-4 w-4" />
+              {intl.formatMessage(messages.exportCollections)}
+            </Button>
+            <Button
+              buttonType="default"
+              buttonSize="sm"
+              disabled={isImporting}
+              onClick={() => importFileRef.current?.click()}
+            >
+              <ArrowUpTrayIcon className="mr-1 h-4 w-4" />
+              {intl.formatMessage(messages.importCollections)}
+            </Button>
+            <input
+              ref={importFileRef}
+              type="file"
+              accept="application/json,.json"
+              className="hidden"
+              onChange={handleImportFile}
+            />
             <p className="text-sm text-gray-400">
               {intl.formatMessage(messages.totalCollections, {
                 count: filteredAndSortedCollections.length,
