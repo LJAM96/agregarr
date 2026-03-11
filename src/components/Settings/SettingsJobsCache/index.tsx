@@ -171,6 +171,19 @@ const jobModalReducer = (
       };
 
     case 'open': {
+      // Fixed-interval jobs always use CRON expression editing
+      if (action.job?.interval === 'fixed') {
+        return {
+          isOpen: true,
+          job: action.job,
+          scheduleHours: 1,
+          scheduleMinutes: 5,
+          scheduleSeconds: 30,
+          useCustomCron: true,
+          customCronExpression: action.job.cronSchedule ?? '',
+        };
+      }
+
       // Parse the existing CRON schedule to determine current preset values
       let scheduleHours = 1;
       let scheduleMinutes = 5;
@@ -413,34 +426,36 @@ const SettingsJobs = () => {
                   {intl.formatMessage(messages.editJobSchedulePrompt)}
                 </label>
                 <div className="form-input-area">
-                  <div className="mb-4">
-                    <label className="mr-6 inline-flex items-center">
-                      <input
-                        type="radio"
-                        className="form-radio"
-                        checked={!jobModalState.useCustomCron}
-                        onChange={() =>
-                          dispatch({ type: 'set', useCustomCron: false })
-                        }
-                      />
-                      <span className="ml-2">
-                        {intl.formatMessage(messages.editJobScheduleUsePreset)}
-                      </span>
-                    </label>
-                    <label className="inline-flex items-center">
-                      <input
-                        type="radio"
-                        className="form-radio"
-                        checked={jobModalState.useCustomCron}
-                        onChange={() =>
-                          dispatch({ type: 'set', useCustomCron: true })
-                        }
-                      />
-                      <span className="ml-2">
-                        {intl.formatMessage(messages.editJobScheduleUseCustom)}
-                      </span>
-                    </label>
-                  </div>
+                  {jobModalState.job?.interval !== 'fixed' && (
+                    <div className="mb-4">
+                      <label className="mr-6 inline-flex items-center">
+                        <input
+                          type="radio"
+                          className="form-radio"
+                          checked={!jobModalState.useCustomCron}
+                          onChange={() =>
+                            dispatch({ type: 'set', useCustomCron: false })
+                          }
+                        />
+                        <span className="ml-2">
+                          {intl.formatMessage(messages.editJobScheduleUsePreset)}
+                        </span>
+                      </label>
+                      <label className="inline-flex items-center">
+                        <input
+                          type="radio"
+                          className="form-radio"
+                          checked={jobModalState.useCustomCron}
+                          onChange={() =>
+                            dispatch({ type: 'set', useCustomCron: true })
+                          }
+                        />
+                        <span className="ml-2">
+                          {intl.formatMessage(messages.editJobScheduleUseCustom)}
+                        </span>
+                      </label>
+                    </div>
+                  )}
 
                   {!jobModalState.useCustomCron ? (
                     // Preset intervals
@@ -709,16 +724,14 @@ const SettingsJobs = () => {
                     })()}
                 </Table.TD>
                 <Table.TD alignText="right">
-                  {job.interval !== 'fixed' && (
-                    <Button
-                      className="mr-2"
-                      buttonType="warning"
-                      onClick={() => dispatch({ type: 'open', job })}
-                    >
-                      <PencilIcon />
-                      <span>{intl.formatMessage(globalMessages.edit)}</span>
-                    </Button>
-                  )}
+                  <Button
+                    className="mr-2"
+                    buttonType="warning"
+                    onClick={() => dispatch({ type: 'open', job })}
+                  >
+                    <PencilIcon />
+                    <span>{intl.formatMessage(globalMessages.edit)}</span>
+                  </Button>
                   {job.running ? (
                     <Button buttonType="danger" onClick={() => cancelJob(job)}>
                       <StopIcon />
