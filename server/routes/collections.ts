@@ -16,6 +16,7 @@ import type {
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
+import { normalizeMDBListSearchUrl } from '@server/utils/mdblistSearchUrl';
 import { Router } from 'express';
 import multer from 'multer';
 
@@ -153,7 +154,7 @@ export function validateExternalUrl(
         if (isSearchPage && urlObj.search) {
           return {
             isValid: true,
-            sanitizedUrl: `${urlObj.protocol}//${urlObj.hostname}${urlObj.pathname}${urlObj.search}`,
+            sanitizedUrl: normalizeMDBListSearchUrl(url),
           };
         }
 
@@ -302,11 +303,9 @@ collectionsRoutes.post('/import', isAuthenticated(), async (req, res) => {
     };
 
     if (!Array.isArray(incoming)) {
-      return res
-        .status(400)
-        .json({
-          error: 'Invalid import data: collectionConfigs must be an array',
-        });
+      return res.status(400).json({
+        error: 'Invalid import data: collectionConfigs must be an array',
+      });
     }
 
     const settings = getSettings();
@@ -318,23 +317,24 @@ collectionsRoutes.post('/import', isAuthenticated(), async (req, res) => {
       .map((c) => {
         // Strip all Plex-instance-specific fields so this collection is treated
         // as new: it will be created fresh in Plex on the next sync.
-        const {
-          collectionRatingKey: _rk,
-          smartCollectionRatingKey: _srk,
-          lastSyncedAt: _ls,
-          lastModifiedAt: _lm,
-          lastSyncError: _le,
-          lastSyncErrorAt: _lea,
-          missing: _m,
-          ...rest
-        } = c as CollectionConfig & {
-          collectionRatingKey?: string;
-          lastSyncedAt?: string;
-          lastModifiedAt?: string;
-          lastSyncError?: string;
-          lastSyncErrorAt?: string;
-          missing?: boolean;
+        const rest = {
+          ...(c as CollectionConfig & {
+            collectionRatingKey?: string;
+            smartCollectionRatingKey?: string;
+            lastSyncedAt?: string;
+            lastModifiedAt?: string;
+            lastSyncError?: string;
+            lastSyncErrorAt?: string;
+            missing?: boolean;
+          }),
         };
+        delete rest.collectionRatingKey;
+        delete rest.smartCollectionRatingKey;
+        delete rest.lastSyncedAt;
+        delete rest.lastModifiedAt;
+        delete rest.lastSyncError;
+        delete rest.lastSyncErrorAt;
+        delete rest.missing;
         return {
           ...rest,
           needsSync: true,
@@ -772,10 +772,18 @@ collectionsRoutes.put('/:id/settings', isAuthenticated(), async (req, res) => {
         }
       }
 
+      const normalizedMDBListUrl =
+        req.body.type === 'mdblist' &&
+        req.body.subtype === 'search' &&
+        req.body.mdblistCustomListUrl
+          ? normalizeMDBListSearchUrl(req.body.mdblistCustomListUrl)
+          : req.body.mdblistCustomListUrl;
+
       // Merge settings while preserving computed fields and library-specific fields
       const updatedConfig: CollectionConfig = {
         ...configToUpdate, // Preserve all existing fields including computed ones
         ...req.body, // Apply user changes
+        mdblistCustomListUrl: normalizedMDBListUrl,
         name: processedName, // Use processed template name
         // Override per-library media fields with library-specific values
         customPoster:
@@ -1628,9 +1636,17 @@ collectionsRoutes.post('/create', isAuthenticated(), async (req, res) => {
         req.body.type === 'tmdb' && req.body.subtype === 'auto_franchise'
       );
 
+      const normalizedMDBListUrl =
+        req.body.type === 'mdblist' &&
+        req.body.subtype === 'search' &&
+        req.body.mdblistCustomListUrl
+          ? normalizeMDBListSearchUrl(req.body.mdblistCustomListUrl)
+          : req.body.mdblistCustomListUrl;
+
       // Create individual config for this library
       const newConfig = {
         ...req.body,
+        mdblistCustomListUrl: normalizedMDBListUrl,
         id: IdGenerator.generateId(),
         libraryId,
         libraryName: library.name,

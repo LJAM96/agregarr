@@ -1,5 +1,6 @@
 import logger from '@server/logger';
-import axios, { type AxiosInstance } from 'axios';
+import { importEsm } from '@server/utils/importEsm';
+import axios, { type AxiosInstance, type CreateAxiosDefaults } from 'axios';
 import { CookieJar } from 'tough-cookie';
 import { AwsWafTokenSolver } from './AwsWafTokenSolver';
 
@@ -52,23 +53,24 @@ export class ImdbAxiosClient {
     this.cookieJar = new CookieJar();
 
     // Create axios instance with cookie jar support (dynamic import for ESM compat)
-    const { wrapper } = await import('axios-cookiejar-support');
-    const client = wrapper(
-      axios.create({
-        jar: this.cookieJar,
-        withCredentials: true,
-        headers: {
-          'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          Accept:
-            'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.9',
-          'Accept-Encoding': 'gzip, deflate, br',
-          'Cache-Control': 'max-age=0',
-          Connection: 'keep-alive',
-        },
-      })
-    );
+    const { wrapper } = await importEsm<{
+      wrapper: (client: AxiosInstance) => AxiosInstance;
+    }>('axios-cookiejar-support');
+    const clientConfig: CreateAxiosDefaults & { jar: CookieJar } = {
+      jar: this.cookieJar,
+      withCredentials: true,
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        Accept:
+          'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Cache-Control': 'max-age=0',
+        Connection: 'keep-alive',
+      },
+    };
+    const client = wrapper(axios.create(clientConfig));
 
     // Add response interceptor to handle WAF challenges
     // CRITICAL: 202 is a SUCCESS status, so we check in the success handler!

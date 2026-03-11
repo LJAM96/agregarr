@@ -12,6 +12,7 @@ import type { CollectionConfig } from '@server/lib/settings';
 import { getSettings, getTmdbLanguage } from '@server/lib/settings';
 import logger from '@server/logger';
 import { isAuthenticated } from '@server/middleware/auth';
+import { normalizeMDBListSearchUrl } from '@server/utils/mdblistSearchUrl';
 import { Router } from 'express';
 
 const collectionsPreviewRoutes = Router();
@@ -412,7 +413,10 @@ async function processMultiSourcePreview(
         else if (source.type === 'letterboxd')
           sourceConfigRecord.letterboxdCustomListUrl = source.customUrl;
         else if (source.type === 'mdblist')
-          sourceConfigRecord.mdblistCustomListUrl = source.customUrl;
+          sourceConfigRecord.mdblistCustomListUrl =
+            source.subtype === 'search'
+              ? normalizeMDBListSearchUrl(source.customUrl)
+              : source.customUrl;
         else if (source.type === 'anilist')
           sourceConfigRecord.anilistCustomListUrl = source.customUrl;
       }
@@ -1044,7 +1048,10 @@ async function processPreviewAsync(
       else if (type === 'letterboxd')
         previewConfigRecord.letterboxdCustomListUrl = customUrl;
       else if (type === 'mdblist')
-        previewConfigRecord.mdblistCustomListUrl = customUrl;
+        previewConfigRecord.mdblistCustomListUrl =
+          subtype === 'search'
+            ? normalizeMDBListSearchUrl(customUrl)
+            : customUrl;
       else if (type === 'anilist')
         previewConfigRecord.anilistCustomListUrl = customUrl;
       else if (type === 'myanimelist')

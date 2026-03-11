@@ -1,5 +1,7 @@
 import logger from '@server/logger';
-import type { AxiosError, AxiosInstance } from 'axios';
+import { importEsm } from '@server/utils/importEsm';
+import { normalizeMDBListSearchUrl } from '@server/utils/mdblistSearchUrl';
+import type { AxiosError, AxiosInstance, CreateAxiosDefaults } from 'axios';
 import axios from 'axios';
 
 export interface MDBListMovie {
@@ -548,8 +550,11 @@ class MDBListAPI {
    */
   public async getSearchListItems(searchUrl: string): Promise<MDBListResponse> {
     try {
+      const normalizedSearchUrl = normalizeMDBListSearchUrl(searchUrl);
       const { JSDOM } = await import('jsdom');
-      const { wrapper } = await import('axios-cookiejar-support');
+      const { wrapper } = await importEsm<{
+        wrapper: (client: AxiosInstance) => AxiosInstance;
+      }>('axios-cookiejar-support');
       const { CookieJar } = await import('tough-cookie');
 
       // MDBList search pages require:
@@ -560,9 +565,13 @@ class MDBListAPI {
         'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
       const jar = new CookieJar();
-      const scrapeClient = wrapper(
-        axios.create({ timeout: 30000, jar })
-      );
+      const scrapeClientConfig: CreateAxiosDefaults & {
+        jar: InstanceType<typeof CookieJar>;
+      } = {
+        timeout: 30000,
+        jar,
+      };
+      const scrapeClient = wrapper(axios.create(scrapeClientConfig));
 
       const baseHeaders: Record<string, string> = {
         'User-Agent': MDBLIST_UA,
@@ -572,7 +581,7 @@ class MDBListAPI {
       };
 
       // Derive base URL (scheme + host + path without query string).
-      const parsedUrl = new URL(searchUrl);
+      const parsedUrl = new URL(normalizedSearchUrl);
       const baseUrl = `${parsedUrl.origin}${parsedUrl.pathname}`;
 
       // Warmup: acquire session cookies before making the search request.
@@ -599,7 +608,9 @@ class MDBListAPI {
       const items: SearchItem[] = [];
 
       // Derive media type from the URL path (/movies/ → movie, anything else → show).
-      const urlMediaType: 'movie' | 'show' = searchUrl.includes('/movies/')
+      const urlMediaType: 'movie' | 'show' = normalizedSearchUrl.includes(
+        '/movies/'
+      )
         ? 'movie'
         : 'show';
 
@@ -665,10 +676,19 @@ class MDBListAPI {
       };
 
       // Fetch and parse the first page.
-      logger.debug(`[MDBList] Scraping search page 1: ${searchUrl}`, {
+      if (normalizedSearchUrl !== searchUrl) {
+        logger.debug(
+          `[MDBList] Normalized search URL from ${searchUrl} to ${normalizedSearchUrl}`,
+          {
+            label: 'MDBList API',
+          }
+        );
+      }
+
+      logger.debug(`[MDBList] Scraping search page 1: ${normalizedSearchUrl}`, {
         label: 'MDBList API',
       });
-      const r1 = await scrapeClient.get(searchUrl, {
+      const r1 = await scrapeClient.get(normalizedSearchUrl, {
         headers: scrapeHeaders,
         timeout: 30000,
       });
@@ -698,7 +718,7 @@ class MDBListAPI {
         const MAX_PAGES = 20;
 
         for (let pageIdx = 0; pageIdx < MAX_PAGES; pageIdx++) {
-          const nextUrl = new URL(searchUrl);
+          const nextUrl = new URL(normalizedSearchUrl);
           nextUrl.searchParams.set('q_current_page', String(pageIdx));
           nextUrl.searchParams.set('q_page_next', '1');
 
@@ -716,10 +736,7 @@ class MDBListAPI {
               timeout: 30000,
             });
             const nextHtml = rNext.data as string;
-            const nextItems = extractItems(
-              new JSDOM(nextHtml),
-              items.length
-            );
+            const nextItems = extractItems(new JSDOM(nextHtml), items.length);
 
             if (nextItems.length === 0) {
               logger.debug('[MDBList] Empty page — pagination complete.', {
@@ -743,7 +760,9 @@ class MDBListAPI {
 
             items.push(...nextItems);
             logger.debug(
-              `[MDBList] Page ${pageIdx + 2} yielded ${nextItems.length} items. Total: ${items.length}`,
+              `[MDBList] Page ${pageIdx + 2} yielded ${
+                nextItems.length
+              } items. Total: ${items.length}`,
               { label: 'MDBList API' }
             );
 
