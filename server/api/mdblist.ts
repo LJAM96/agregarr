@@ -549,19 +549,41 @@ class MDBListAPI {
   public async getSearchListItems(searchUrl: string): Promise<MDBListResponse> {
     try {
       const { JSDOM } = await import('jsdom');
+      const { wrapper } = await import('axios-cookiejar-support');
+      const { CookieJar } = await import('tough-cookie');
 
-      // MDBList search pages require a browser-like User-Agent and the
-      // X-Requested-With header to return HTML results (without it the
-      // server returns 403 even for publicly-accessible search pages).
+      // MDBList search pages require:
+      // 1. A warmup GET to the base page to acquire the mdb_public_search_token
+      //    cookie (HttpOnly, 30-min validity) — without it, searches return 403.
+      // 2. X-Requested-With: XMLHttpRequest on the search request.
       const MDBLIST_UA =
         'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
-      const scrapeHeaders: Record<string, string> = {
+      const jar = new CookieJar();
+      const scrapeClient = wrapper(
+        axios.create({ timeout: 30000, jar })
+      );
+
+      const baseHeaders: Record<string, string> = {
         'User-Agent': MDBLIST_UA,
         Accept:
           'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9',
-        Referer: 'https://mdblist.com/',
+      };
+
+      // Derive base URL (scheme + host + path without query string).
+      const parsedUrl = new URL(searchUrl);
+      const baseUrl = `${parsedUrl.origin}${parsedUrl.pathname}`;
+
+      // Warmup: acquire session cookies before making the search request.
+      logger.debug(`[MDBList] Warming up session: GET ${baseUrl}`, {
+        label: 'MDBList API',
+      });
+      await scrapeClient.get(baseUrl, { headers: baseHeaders });
+
+      const scrapeHeaders: Record<string, string> = {
+        ...baseHeaders,
+        Referer: baseUrl,
         'X-Requested-With': 'XMLHttpRequest',
       };
 
@@ -636,7 +658,7 @@ class MDBListAPI {
       logger.debug(`[MDBList] Scraping search page 1: ${searchUrl}`, {
         label: 'MDBList API',
       });
-      const r1 = await axios.get(searchUrl, {
+      const r1 = await scrapeClient.get(searchUrl, {
         headers: scrapeHeaders,
         timeout: 30000,
       });
@@ -669,7 +691,7 @@ class MDBListAPI {
         );
 
         try {
-          const rNext = await axios.get(nextUrl.toString(), {
+          const rNext = await scrapeClient.get(nextUrl.toString(), {
             headers: scrapeHeaders,
             timeout: 30000,
           });
