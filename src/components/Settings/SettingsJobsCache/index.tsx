@@ -653,7 +653,6 @@ const SettingsJobs = () => {
                         ) : (
                           <FormattedRelativeTime
                             value={Math.floor(secondsUntilNext / 86400)}
-                            updateIntervalInSeconds={3600}
                             numeric="auto"
                             unit="day"
                           />
