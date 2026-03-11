@@ -4491,6 +4491,28 @@ components:
         label:
           type: string
           example: A Label
+    EditionManagerSettings:
+      type: object
+      properties:
+        enabledModules:
+          type: array
+          items:
+            type: string
+          example: ['Resolution', 'Size', 'Source', 'Bitrate', 'DynamicRange', 'AudioCodec']
+          description: Ordered list of enabled module names
+        separator:
+          type: string
+          example: ' · '
+          description: Separator string between module values in the edition title
+        ratingSource:
+          type: string
+          enum: [imdb, tmdb, rt]
+          example: imdb
+          description: Rating source to use for the Rating module
+        language:
+          type: string
+          example: en
+          description: ISO 639-1 language code for language-based modules
     WatchlistSyncSettings:
       type: object
       properties:
@@ -10920,6 +10942,37 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/WatchlistSyncSettings'
+  /settings/edition-manager:
+    get:
+      summary: Get Edition Manager settings
+      description: Returns the current Edition Manager settings including enabled modules, order, separator, and rating source.
+      tags:
+        - settings-services
+      responses:
+        '200':
+          description: Edition Manager settings returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EditionManagerSettings'
+    post:
+      summary: Update Edition Manager settings
+      description: Updates the Edition Manager settings including enabled modules, order, separator, and rating source.
+      tags:
+        - settings-services
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EditionManagerSettings'
+      responses:
+        '200':
+          description: Edition Manager settings updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EditionManagerSettings'
   /settings/public:
     get:
       summary: Get public settings
