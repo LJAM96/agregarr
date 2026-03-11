@@ -1,6 +1,5 @@
 import logger from '@server/logger';
 import axios, { type AxiosInstance } from 'axios';
-import { wrapper } from 'axios-cookiejar-support';
 import { CookieJar } from 'tough-cookie';
 import { AwsWafTokenSolver } from './AwsWafTokenSolver';
 
@@ -52,7 +51,8 @@ export class ImdbAxiosClient {
     // Create cookie jar
     this.cookieJar = new CookieJar();
 
-    // Create axios instance with cookie jar support
+    // Create axios instance with cookie jar support (dynamic import for ESM compat)
+    const { wrapper } = await import('axios-cookiejar-support');
     const client = wrapper(
       axios.create({
         jar: this.cookieJar,
