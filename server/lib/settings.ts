@@ -696,7 +696,8 @@ export type JobId =
   | 'overlay-quick-sync'
   | 'watchlist-sync'
   | 'plex-delete-unlabelled-collections'
-  | 'plex-edition-manager';
+  | 'plex-edition-manager'
+  | 'plex-edition-manager-incremental';
 
 export interface GlobalExclusions {
   movies: number[]; // TMDB IDs for excluded movies
@@ -798,7 +799,10 @@ class Settings {
           schedule: '0 0 4 * * 0', // Weekly at 4am Sunday (disabled by default — run manually)
         },
         'plex-edition-manager': {
-          schedule: '0 0 2 * * *', // Daily at 2am
+          schedule: '0 0 2 * * *', // Daily at 2am (full run)
+        },
+        'plex-edition-manager-incremental': {
+          schedule: '0 0 2 * * *', // Daily at 2am (incremental — skips already-set editions)
         },
       },
       watchlistSync: {

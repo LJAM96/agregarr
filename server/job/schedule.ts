@@ -206,13 +206,27 @@ export const startJobs = (): void => {
 
   scheduledJobs.push({
     id: 'plex-edition-manager',
-    name: 'Edition Manager',
+    name: 'Edition Manager (Full)',
     type: 'process',
     interval: 'fixed',
     cronSchedule: jobs['plex-edition-manager'].schedule,
     job: schedule.scheduleJob(jobs['plex-edition-manager'].schedule, () => {
-      logger.info('Starting scheduled job: Edition Manager', { label: 'Jobs' });
-      editionManager.run();
+      logger.info('Starting scheduled job: Edition Manager (Full)', { label: 'Jobs' });
+      editionManager.run('full');
+    }),
+    running: () => editionManager.status.running,
+    cancelFn: () => editionManager.cancel(),
+  });
+
+  scheduledJobs.push({
+    id: 'plex-edition-manager-incremental',
+    name: 'Edition Manager (Incremental)',
+    type: 'process',
+    interval: 'fixed',
+    cronSchedule: jobs['plex-edition-manager-incremental'].schedule,
+    job: schedule.scheduleJob(jobs['plex-edition-manager-incremental'].schedule, () => {
+      logger.info('Starting scheduled job: Edition Manager (Incremental)', { label: 'Jobs' });
+      editionManager.run('incremental');
     }),
     running: () => editionManager.status.running,
     cancelFn: () => editionManager.cancel(),

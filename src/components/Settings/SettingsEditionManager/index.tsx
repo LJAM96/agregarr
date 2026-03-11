@@ -86,7 +86,8 @@ const messages = defineMessages({
   toastFailure: 'Failed to save Edition Manager settings.',
   toastRunSuccess: 'Edition Manager job started.',
   toastRunFailure: 'Failed to start Edition Manager job.',
-  runNow: 'Run Now',
+  runFull: 'Run Full',
+  runIncremental: 'Run Incremental',
   save: 'Save Changes',
   saving: 'Saving…',
 });
@@ -226,9 +227,9 @@ const SettingsEditionManager = () => {
     }
   };
 
-  const handleRunNow = async () => {
+  const handleRunNow = async (jobId: string) => {
     try {
-      await axios.post('/api/v1/settings/jobs/plex-edition-manager/run');
+      await axios.post(`/api/v1/settings/jobs/${jobId}/run`);
       addToast(intl.formatMessage(messages.toastRunSuccess), {
         appearance: 'success',
         autoDismiss: true,
@@ -398,10 +399,19 @@ const SettingsEditionManager = () => {
           </Button>
           <Button
             buttonType="default"
-            onClick={handleRunNow}
+            onClick={() => handleRunNow('plex-edition-manager-incremental')}
+            title="Only processes movies that don't already have an edition set"
           >
             <PlayIcon className="mr-2 h-4 w-4" />
-            {intl.formatMessage(messages.runNow)}
+            {intl.formatMessage(messages.runIncremental)}
+          </Button>
+          <Button
+            buttonType="default"
+            onClick={() => handleRunNow('plex-edition-manager')}
+            title="Re-processes all movies, overwriting any existing editions"
+          >
+            <PlayIcon className="mr-2 h-4 w-4" />
+            {intl.formatMessage(messages.runFull)}
           </Button>
         </div>
       </div>

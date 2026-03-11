@@ -58,7 +58,7 @@ class EditionManager {
     currentLibrary: '',
   };
 
-  public async run(): Promise<void> {
+  public async run(mode: 'full' | 'incremental' = 'full'): Promise<void> {
     if (this.status.running) {
       logger.warn('Edition Manager already running', { label: 'Edition Manager' });
       return;
@@ -76,7 +76,7 @@ class EditionManager {
     };
     this.cancelled = false;
 
-    logger.info('Edition Manager started', { label: 'Edition Manager' });
+    logger.info(`Edition Manager started (mode: ${mode})`, { label: 'Edition Manager' });
 
     try {
       const { getAdminUser } = await import(
@@ -137,6 +137,19 @@ class EditionManager {
             if (this.cancelled) break;
 
             try {
+              // In incremental mode, skip movies that already have an edition set.
+              // editionTitle is returned by the listing endpoint so we avoid an
+              // extra per-movie metadata fetch for these.
+              if (mode === 'incremental' && item.editionTitle) {
+                this.status.skipped++;
+                this.status.processed++;
+                logger.debug(
+                  `Skipping '${item.title}' — edition already set: '${item.editionTitle}'`,
+                  { label: 'Edition Manager' }
+                );
+                continue;
+              }
+
               const movieData = (await plexClient.getMovieFullMetadata(
                 item.ratingKey
               )) as PlexMovieData;
