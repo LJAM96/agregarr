@@ -672,6 +672,21 @@ export interface OverlaySettings {
   initialSetupComplete: boolean;
 }
 
+export interface EditionManagerSettings {
+  /** Ordered list of enabled module names */
+  enabledModules: string[];
+  /** Separator string between module outputs, e.g. ' · ' */
+  separator: string;
+  /** Source for the Rating module */
+  ratingSource: 'imdb' | 'rotten_tomatoes' | 'letterboxd';
+  /** Which Rotten Tomatoes score to use (critic or audience) */
+  ratingRottenTomatoesType: 'critic' | 'audience';
+  /** Audio language codes to exclude from the Language module, e.g. ['English'] */
+  languageExcluded: string[];
+  /** Skip Language module output when a movie has multiple audio tracks */
+  languageSkipMultiple: boolean;
+}
+
 export type JobId =
   | 'plex-refresh-token'
   | 'plex-collections-sync'
@@ -680,7 +695,8 @@ export type JobId =
   | 'overlay-application'
   | 'overlay-quick-sync'
   | 'watchlist-sync'
-  | 'plex-delete-unlabelled-collections';
+  | 'plex-delete-unlabelled-collections'
+  | 'plex-edition-manager';
 
 export interface GlobalExclusions {
   movies: number[]; // TMDB IDs for excluded movies
@@ -706,6 +722,7 @@ interface AllSettings {
   globalExclusions?: GlobalExclusions; // Global item exclusions for collections
   completedMigrations?: string[]; // Track completed migrations
   overlays?: OverlaySettings; // Overlay system settings
+  editionManager?: EditionManagerSettings;
 }
 
 const SETTINGS_PATH = process.env.CONFIG_DIRECTORY
@@ -779,6 +796,9 @@ class Settings {
         },
         'plex-delete-unlabelled-collections': {
           schedule: '0 0 4 * * 0', // Weekly at 4am Sunday (disabled by default — run manually)
+        },
+        'plex-edition-manager': {
+          schedule: '0 0 2 * * *', // Daily at 2am
         },
       },
       watchlistSync: {
@@ -1108,6 +1128,32 @@ class Settings {
 
   set overlays(data: OverlaySettings | undefined) {
     this.data.overlays = data;
+  }
+
+  get editionManager(): EditionManagerSettings {
+    return (
+      this.data.editionManager ?? {
+        enabledModules: [
+          'Resolution',
+          'Size',
+          'Source',
+          'Bitrate',
+          'DynamicRange',
+          'Release',
+          'Cut',
+          'AudioCodec',
+        ],
+        separator: ' · ',
+        ratingSource: 'imdb',
+        ratingRottenTomatoesType: 'critic',
+        languageExcluded: ['English'],
+        languageSkipMultiple: false,
+      }
+    );
+  }
+
+  set editionManager(data: EditionManagerSettings) {
+    this.data.editionManager = data;
   }
 
   // VAPID keys methods removed - push notifications not needed in Agregarr

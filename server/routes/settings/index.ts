@@ -21,6 +21,7 @@ import cacheManager from '@server/lib/cache';
 // ImageProxy removed - not needed for collections-only app
 // Plex scanner import removed - not needed for collections-only app
 import type {
+  EditionManagerSettings,
   JobId,
   MainSettings,
   WatchlistSyncSettings,
@@ -1466,6 +1467,18 @@ settingsRoutes.post('/watchlistsync', (req, res) => {
   settings.save();
 
   return res.status(200).json(settings.watchlistSync);
+});
+
+settingsRoutes.get('/edition-manager', (_req, res) => {
+  const settings = getSettings();
+  return res.status(200).json(settings.editionManager);
+});
+
+settingsRoutes.post('/edition-manager', (req, res) => {
+  const settings = getSettings();
+  settings.editionManager = req.body as EditionManagerSettings;
+  settings.save();
+  return res.status(200).json(settings.editionManager);
 });
 
 settingsRoutes.post('/export-debug', (req, res, next) => {

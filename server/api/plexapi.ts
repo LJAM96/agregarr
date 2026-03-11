@@ -2897,6 +2897,36 @@ class PlexAPI {
       return [];
     }
   }
+  // ---------------------------------------------------------------------------
+  // Edition Manager helpers
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Fetch full movie metadata including Media / Part / Stream details.
+   * Required for the Edition Manager modules (stream-level data is not
+   * returned by the bulk library listing endpoint).
+   */
+  public async getMovieFullMetadata(ratingKey: string): Promise<Record<string, unknown>> {
+    const response = await this.plexClient.query<{
+      MediaContainer: { Metadata: Record<string, unknown>[] };
+    }>(`/library/metadata/${ratingKey}?checkFiles=1&includeAllConcerts=1&includeBandwidths=1&includeChapters=1&includeMarkers=1&includeGuids=1`);
+
+    return response.MediaContainer.Metadata?.[0] ?? {};
+  }
+
+  /**
+   * Set (lock) the editionTitle field for a movie.
+   * Pass an empty string to clear it instead.
+   */
+  public async setMovieEditionTitle(
+    ratingKey: string,
+    title: string
+  ): Promise<void> {
+    const locked = title ? 1 : 0;
+    const encoded = encodeURIComponent(title);
+    const url = `/library/metadata/${ratingKey}?type=1&id=${ratingKey}&editionTitle.value=${encoded}&editionTitle.locked=${locked}`;
+    await this.safePutQuery(url);
+  }
 }
 
 export default PlexAPI;

@@ -3,6 +3,7 @@ import collectionsQuickSync from '@server/lib/collectionsQuickSync';
 import collectionsSync from '@server/lib/collectionsSync';
 // ImageProxy removed - not needed for collections-only app
 import deleteUnlabelledCollections from '@server/lib/deleteUnlabelledCollections';
+import editionManager from '@server/lib/editionManager';
 import overlayApplication from '@server/lib/overlayApplication';
 import overlaysQuickSync from '@server/lib/overlaysQuickSync';
 import randomizeHomeOrder from '@server/lib/randomizeHomeOrder';
@@ -201,6 +202,20 @@ export const startJobs = (): void => {
     ),
     running: () => deleteUnlabelledCollections.status.running,
     cancelFn: () => deleteUnlabelledCollections.cancel(),
+  });
+
+  scheduledJobs.push({
+    id: 'plex-edition-manager',
+    name: 'Edition Manager',
+    type: 'process',
+    interval: 'fixed',
+    cronSchedule: jobs['plex-edition-manager'].schedule,
+    job: schedule.scheduleJob(jobs['plex-edition-manager'].schedule, () => {
+      logger.info('Starting scheduled job: Edition Manager', { label: 'Jobs' });
+      editionManager.run();
+    }),
+    running: () => editionManager.status.running,
+    cancelFn: () => editionManager.cancel(),
   });
 
   logger.info('Scheduled jobs loaded', { label: 'Jobs' });

@@ -11,6 +11,7 @@ const messages = defineMessages({
   menuDownloads: 'Downloads',
   menuLogs: 'Logs',
   menuJobs: 'Jobs',
+  menuEditions: 'Editions',
   menuAbout: 'About',
 });
 
@@ -51,6 +52,11 @@ const SettingsLayout = ({ children }: SettingsLayoutProps) => {
       text: intl.formatMessage(messages.menuJobs),
       route: '/settings/jobs',
       regex: /^\/settings\/jobs/,
+    },
+    {
+      text: intl.formatMessage(messages.menuEditions),
+      route: '/settings/edition-manager',
+      regex: /^\/settings\/edition-manager/,
     },
     {
       text: intl.formatMessage(messages.menuAbout),
