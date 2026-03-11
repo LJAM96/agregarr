@@ -22,7 +22,6 @@ import {
   getFrameRate,
   getGenre,
   getLanguage,
-  getRating,
   getRelease,
   getResolution,
   getShortFilm,
@@ -156,8 +155,7 @@ class EditionManager {
 
               const editionTitle = await this.buildEditionTitle(
                 movieData,
-                emSettings,
-                settings.main.tmdbApiKey
+                emSettings
               );
 
               if (editionTitle !== null) {
@@ -219,8 +217,7 @@ class EditionManager {
       ratingRottenTomatoesType: 'critic' | 'audience';
       languageExcluded: string[];
       languageSkipMultiple: boolean;
-    },
-    tmdbApiKey?: string
+    }
   ): Promise<string | null> {
     const parts: string[] = [];
 
@@ -262,11 +259,12 @@ class EditionManager {
           });
           break;
         case 'Rating':
-          value = await getRating(
+          // Use the app's built-in TMDb client for IMDb ratings;
+          // Rotten Tomatoes uses Plex's own audienceRating/rating fields.
+          value = await this.getRatingValue(
             data,
             settings.ratingSource,
-            settings.ratingRottenTomatoesType,
-            tmdbApiKey
+            settings.ratingRottenTomatoesType
           );
           break;
         case 'Size':
@@ -308,6 +306,36 @@ class EditionManager {
     }
 
     return parts.length ? parts.join(settings.separator) : null;
+  }
+
+  private async getRatingValue(
+    data: PlexMovieData,
+    source: 'imdb' | 'rotten_tomatoes' | 'letterboxd',
+    rtType: 'critic' | 'audience'
+  ): Promise<string | null> {
+    if (source === 'rotten_tomatoes') {
+      const val = rtType === 'audience' ? data.audienceRating : data.rating;
+      if (!val) return null;
+      return `${Math.round(val * 10)}%`;
+    }
+
+    if (source === 'imdb') {
+      try {
+        const TheMovieDb = (await import('@server/api/themoviedb')).default;
+        const tmdb = new TheMovieDb();
+        const results = await tmdb.searchMovies({
+          query: data.title ?? '',
+          year: data.year,
+        });
+        const movie = results.results?.[0];
+        if (!movie?.vote_average) return null;
+        return `IMDb ${movie.vote_average.toFixed(1)}`;
+      } catch {
+        return null;
+      }
+    }
+
+    return null;
   }
 }
 
