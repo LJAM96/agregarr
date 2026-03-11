@@ -2,6 +2,7 @@
 import collectionsQuickSync from '@server/lib/collectionsQuickSync';
 import collectionsSync from '@server/lib/collectionsSync';
 // ImageProxy removed - not needed for collections-only app
+import deleteUnlabelledCollections from '@server/lib/deleteUnlabelledCollections';
 import overlayApplication from '@server/lib/overlayApplication';
 import overlaysQuickSync from '@server/lib/overlaysQuickSync';
 import randomizeHomeOrder from '@server/lib/randomizeHomeOrder';
@@ -180,6 +181,26 @@ export const startJobs = (): void => {
     }),
     running: () => watchlistSync.status.running,
     cancelFn: () => watchlistSync.cancel(),
+  });
+
+  scheduledJobs.push({
+    id: 'plex-delete-unlabelled-collections',
+    name: 'Delete Unlabelled Collections',
+    type: 'process',
+    interval: 'fixed',
+    cronSchedule: jobs['plex-delete-unlabelled-collections'].schedule,
+    job: schedule.scheduleJob(
+      jobs['plex-delete-unlabelled-collections'].schedule,
+      () => {
+        logger.info(
+          'Starting scheduled job: Delete Unlabelled Collections',
+          { label: 'Jobs' }
+        );
+        deleteUnlabelledCollections.run();
+      }
+    ),
+    running: () => deleteUnlabelledCollections.status.running,
+    cancelFn: () => deleteUnlabelledCollections.cancel(),
   });
 
   logger.info('Scheduled jobs loaded', { label: 'Jobs' });

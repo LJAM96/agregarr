@@ -679,7 +679,8 @@ export type JobId =
   | 'plex-randomize-home-order'
   | 'overlay-application'
   | 'overlay-quick-sync'
-  | 'watchlist-sync';
+  | 'watchlist-sync'
+  | 'plex-delete-unlabelled-collections';
 
 export interface GlobalExclusions {
   movies: number[]; // TMDB IDs for excluded movies
@@ -775,6 +776,9 @@ class Settings {
         },
         'watchlist-sync': {
           schedule: '0 0 */6 * * *', // Every 6 hours
+        },
+        'plex-delete-unlabelled-collections': {
+          schedule: '0 0 4 * * 0', // Weekly at 4am Sunday (disabled by default — run manually)
         },
       },
       watchlistSync: {
