@@ -291,7 +291,9 @@ collectionsRoutes.get('/export', isAuthenticated(), (_req, res) => {
 
 /**
  * POST /api/v1/collections/import
- * Import collection configurations from JSON, merging with existing (skip duplicates by ID)
+ * Import collection configurations from JSON, merging with existing (skip duplicates by ID).
+ * Strips Plex-instance-specific fields so imported collections are treated as new and
+ * will appear as editable Agregarr-managed collections (not pre-existing Plex collections).
  */
 collectionsRoutes.post('/import', isAuthenticated(), async (req, res) => {
   try {
@@ -311,7 +313,34 @@ collectionsRoutes.post('/import', isAuthenticated(), async (req, res) => {
     const existing = settings.plex.collectionConfigs || [];
     const existingIds = new Set(existing.map((c) => c.id));
 
-    const newConfigs = incoming.filter((c) => c.id && !existingIds.has(c.id));
+    const newConfigs = incoming
+      .filter((c) => c.id && !existingIds.has(c.id))
+      .map((c) => {
+        // Strip all Plex-instance-specific fields so this collection is treated
+        // as new: it will be created fresh in Plex on the next sync.
+        const {
+          collectionRatingKey: _rk,
+          smartCollectionRatingKey: _srk,
+          lastSyncedAt: _ls,
+          lastModifiedAt: _lm,
+          lastSyncError: _le,
+          lastSyncErrorAt: _lea,
+          missing: _m,
+          ...rest
+        } = c as CollectionConfig & {
+          collectionRatingKey?: string;
+          lastSyncedAt?: string;
+          lastModifiedAt?: string;
+          lastSyncError?: string;
+          lastSyncErrorAt?: string;
+          missing?: boolean;
+        };
+        return {
+          ...rest,
+          needsSync: true,
+          isActive: true,
+        };
+      });
 
     settings.plex.collectionConfigs = [...existing, ...newConfigs];
     await settings.save();
