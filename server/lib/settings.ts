@@ -492,6 +492,7 @@ export interface TraktSettings {
 
 export interface MDBListSettings {
   apiKey?: string;
+  sessionCookie?: string;
 }
 
 export interface MyAnimeListSettings {

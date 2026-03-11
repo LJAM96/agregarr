@@ -62,8 +62,10 @@ export interface MDBListUserInfo {
 
 class MDBListAPI {
   private axios: AxiosInstance;
+  private sessionCookie?: string;
 
-  constructor(apiKey: string) {
+  constructor(apiKey: string, sessionCookie?: string) {
+    this.sessionCookie = sessionCookie;
     this.axios = axios.create({
       baseURL: 'https://api.mdblist.com',
       params: {
@@ -550,9 +552,21 @@ class MDBListAPI {
     try {
       const { JSDOM } = await import('jsdom');
 
-      // MDBList search pages require a browser-like User-Agent to return HTML content.
+      // MDBList search pages require a browser-like User-Agent and a session
+      // cookie (csrftoken + sessionid) to access filter/search pages.
       const MDBLIST_UA =
         'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+      const scrapeHeaders: Record<string, string> = {
+        'User-Agent': MDBLIST_UA,
+        Accept:
+          'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        Referer: 'https://mdblist.com/',
+        ...(this.sessionCookie
+          ? { Cookie: this.sessionCookie }
+          : {}),
+      };
 
       interface SearchItem {
         id: string;
@@ -626,7 +640,7 @@ class MDBListAPI {
         label: 'MDBList API',
       });
       const r1 = await axios.get(searchUrl, {
-        headers: { 'User-Agent': MDBLIST_UA },
+        headers: scrapeHeaders,
         timeout: 30000,
       });
       const page1Items = extractItems(new JSDOM(r1.data as string), 0);
@@ -659,7 +673,7 @@ class MDBListAPI {
 
         try {
           const rNext = await axios.get(nextUrl.toString(), {
-            headers: { 'User-Agent': MDBLIST_UA },
+            headers: scrapeHeaders,
             timeout: 30000,
           });
           const nextItems = extractItems(

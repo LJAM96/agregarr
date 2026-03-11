@@ -195,7 +195,8 @@ export class MDBListCollectionSync extends BaseCollectionSync<'mdblist'> {
         'MDBList API key not configured'
       );
     }
-    const mdblistClient = this.getMDBListClient(apiKey);
+    const sessionCookie = settings.mdblist.sessionCookie;
+    const mdblistClient = this.getMDBListClient(apiKey, sessionCookie);
     const listType = this.getListTypeFromSubtype(config.subtype);
 
     const mdblistData: MDBListSourceData[] = [];
@@ -565,11 +566,12 @@ export class MDBListCollectionSync extends BaseCollectionSync<'mdblist'> {
 
   // Private helper methods
 
-  private getMDBListClient(apiKey: string): MDBListAPI {
-    if (!this.mdblistClients.has(apiKey)) {
-      this.mdblistClients.set(apiKey, new MDBListAPI(apiKey));
+  private getMDBListClient(apiKey: string, sessionCookie?: string): MDBListAPI {
+    const cacheKey = sessionCookie ? `${apiKey}:${sessionCookie}` : apiKey;
+    if (!this.mdblistClients.has(cacheKey)) {
+      this.mdblistClients.set(cacheKey, new MDBListAPI(apiKey, sessionCookie));
     }
-    const client = this.mdblistClients.get(apiKey);
+    const client = this.mdblistClients.get(cacheKey);
     if (!client) {
       throw new Error(`Failed to get MDBList client for API key`);
     }
