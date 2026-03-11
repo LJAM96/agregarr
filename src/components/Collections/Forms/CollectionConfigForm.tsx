@@ -270,6 +270,47 @@ const messages = defineMessages({
   connectionError: 'Connection error',
 });
 
+const getSingleSourceCustomUrl = (
+  config: CollectionFormConfig
+): string | undefined => {
+  const matchingSourceUrl =
+    config.sources?.find(
+      (source) =>
+        source.type === config.type &&
+        ((source.subtype ?? '') === (config.subtype ?? '') || !source.subtype)
+    )?.customUrl ||
+    config.sources?.find((source) => source.type === config.type)?.customUrl;
+
+  if (config.type === 'trakt' && config.subtype === 'custom') {
+    return config.traktCustomListUrl || matchingSourceUrl;
+  }
+
+  if (config.type === 'tmdb' && config.subtype === 'custom') {
+    return config.tmdbCustomCollectionUrl || matchingSourceUrl;
+  }
+
+  if (config.type === 'imdb' && config.subtype === 'custom') {
+    return config.imdbCustomListUrl || matchingSourceUrl;
+  }
+
+  if (config.type === 'letterboxd' && config.subtype === 'custom') {
+    return config.letterboxdCustomListUrl || matchingSourceUrl;
+  }
+
+  if (
+    config.type === 'mdblist' &&
+    (config.subtype === 'custom' || config.subtype === 'search')
+  ) {
+    return config.mdblistCustomListUrl || matchingSourceUrl;
+  }
+
+  if (config.type === 'anilist' && config.subtype === 'custom') {
+    return config.anilistCustomListUrl || matchingSourceUrl;
+  }
+
+  return matchingSourceUrl;
+};
+
 const CollectionFormConfigForm = ({
   config,
   onSave,
@@ -282,6 +323,10 @@ const CollectionFormConfigForm = ({
 }: CollectionConfigFormProps) => {
   const intl = useIntl();
   const { addToast } = useToasts();
+  const existingCollectionConfig = config as CollectionFormConfig;
+  const singleSourceCustomUrl = getSingleSourceCustomUrl(
+    existingCollectionConfig
+  );
 
   // Get current user data which includes Plex Pass status
   const { data: currentUser } = useSWR('/api/v1/auth/me');
@@ -1799,7 +1844,11 @@ const CollectionFormConfigForm = ({
           customTheme: (config as CollectionFormConfig).customTheme || '',
           // Custom URL fields (default to empty strings to prevent uncontrolled->controlled warnings)
           traktCustomListUrl:
-            (config as CollectionFormConfig).traktCustomListUrl || '',
+            (config as CollectionFormConfig).traktCustomListUrl ||
+            ((config as CollectionFormConfig).type === 'trakt' &&
+            (config as CollectionFormConfig).subtype === 'custom'
+              ? singleSourceCustomUrl || ''
+              : ''),
           tmdbCustomCollectionUrl:
             (config as CollectionFormConfig).tmdbCustomCollectionUrl || '',
           imdbCustomListUrl:
@@ -1807,9 +1856,19 @@ const CollectionFormConfigForm = ({
           letterboxdCustomListUrl:
             (config as CollectionFormConfig).letterboxdCustomListUrl || '',
           mdblistCustomListUrl:
-            (config as CollectionFormConfig).mdblistCustomListUrl || '',
+            (config as CollectionFormConfig).mdblistCustomListUrl ||
+            ((config as CollectionFormConfig).type === 'mdblist' &&
+            ['custom', 'search'].includes(
+              (config as CollectionFormConfig).subtype || ''
+            )
+              ? singleSourceCustomUrl || ''
+              : ''),
           anilistCustomListUrl:
-            (config as CollectionFormConfig).anilistCustomListUrl || '',
+            (config as CollectionFormConfig).anilistCustomListUrl ||
+            ((config as CollectionFormConfig).type === 'anilist' &&
+            (config as CollectionFormConfig).subtype === 'custom'
+              ? singleSourceCustomUrl || ''
+              : ''),
           // Enable flags for custom features (default to false)
           enableCustomWallpaper:
             (config as CollectionFormConfig).enableCustomWallpaper ?? false,
@@ -1865,13 +1924,7 @@ const CollectionFormConfigForm = ({
                   type: existingConfig.type,
                   subtype: existingConfig.subtype,
                   timePeriod: existingConfig.timePeriod,
-                  customUrl:
-                    existingConfig.traktCustomListUrl ||
-                    existingConfig.tmdbCustomCollectionUrl ||
-                    existingConfig.imdbCustomListUrl ||
-                    existingConfig.letterboxdCustomListUrl ||
-                    existingConfig.mdblistCustomListUrl ||
-                    existingConfig.anilistCustomListUrl,
+                  customUrl: getSingleSourceCustomUrl(existingConfig),
                   customDays: existingConfig.customDays,
                   minimumPlays: existingConfig.minimumPlays,
                   networksCountry: existingConfig.networksCountry,
@@ -2093,6 +2146,31 @@ const CollectionFormConfigForm = ({
             // For multi-source collections, ensure type is set correctly
             type: values.isMultiSource ? 'multi-source' : values.type,
             subtype: finalSubtype,
+            traktCustomListUrl:
+              values.type === 'trakt' && finalSubtype === 'custom'
+                ? optionalString(values.traktCustomListUrl)
+                : undefined,
+            tmdbCustomCollectionUrl:
+              values.type === 'tmdb' && finalSubtype === 'custom'
+                ? optionalString(values.tmdbCustomCollectionUrl)
+                : undefined,
+            imdbCustomListUrl:
+              values.type === 'imdb' && finalSubtype === 'custom'
+                ? optionalString(values.imdbCustomListUrl)
+                : undefined,
+            letterboxdCustomListUrl:
+              values.type === 'letterboxd' && finalSubtype === 'custom'
+                ? optionalString(values.letterboxdCustomListUrl)
+                : undefined,
+            mdblistCustomListUrl:
+              values.type === 'mdblist' &&
+              ['custom', 'search'].includes(finalSubtype)
+                ? optionalString(values.mdblistCustomListUrl)
+                : undefined,
+            anilistCustomListUrl:
+              values.type === 'anilist' && finalSubtype === 'custom'
+                ? optionalString(values.anilistCustomListUrl)
+                : undefined,
             libraryId: values.libraryId as string,
             libraryName: values.libraryName as string,
             // Force deterministic names for multi-collection patterns (for UI consistency)
