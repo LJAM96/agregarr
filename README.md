@@ -1,3 +1,7 @@
+Vibe coded fork with additions of MDBList Search URL so you can have as many MDBLists as you want without having a membership.
+
+Also intergrates https://github.com/x1ao4/edition-manager-for-plex
+
 # Agregarr
 
 Agregarr keeps your Plex Home and Recommended fresh by frequently updating it with Collections from various sources, including Trakt, IMDb, TMDB, Letterboxd, MDBList, FlixPatrol (Networks Top 10), AniList and MyAnimeList, as well as generated Collections from Tautulli Statistics, and Overseerr Requests. It has various options for downloading missing media, including as requests through Overseerr, or directly through Radarr/Sonarr. Collections can be reordered on the Home/Recommended and Library tabs independently, and can have time periods or days set for their visibility in Plex.
