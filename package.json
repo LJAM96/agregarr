@@ -215,7 +215,6 @@
     ]
   },
   "release": {
-    "repositoryUrl": "https://github.com/LJAM96/agregarr.git",
     "plugins": [
       "@semantic-release/commit-analyzer",
       "@semantic-release/release-notes-generator",
