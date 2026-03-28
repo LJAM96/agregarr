@@ -55,7 +55,19 @@ jobs:
           } >> "${GITHUB_OUTPUT}"
 
       - name: Update package.json version for build metadata
-        run: npm version "${{ steps.vars.outputs.normalized_version }}" --no-git-tag-version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          current_version="$(node -p "require('./package.json').version")"
+          target_version="${{ steps.vars.outputs.normalized_version }}"
+
+          if [[ "${current_version}" == "${target_version}" ]]; then
+            echo "package.json already at ${target_version}; skipping version update."
+            exit 0
+          fi
+
+          npm version "${target_version}" --no-git-tag-version
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
