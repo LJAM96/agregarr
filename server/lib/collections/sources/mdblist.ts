@@ -230,6 +230,22 @@ export class MDBListCollectionSync extends BaseCollectionSync<'mdblist'> {
           : config.mdblistCustomListUrl?.split('?')[0] ||
             config.mdblistCustomListUrl;
 
+      if (listType === 'search') {
+        logger.debug('Fetching MDBList search results', {
+          label: 'MDBList Collections',
+        });
+
+        const searchData = await mdblistClient.getCustomList(cleanUrl);
+        const targetItems: (MDBListMovie | MDBListShow)[] =
+          mediaType === 'movie' ? searchData.movies : searchData.shows;
+
+        if (targetItems.length > 0) {
+          mdblistData.push(...targetItems.map((item) => ({ item, mediaType })));
+        }
+
+        return mdblistData;
+      }
+
       const limit = 1000;
       let offset = 0;
       let hasMore = true;

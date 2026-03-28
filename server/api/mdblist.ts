@@ -583,6 +583,14 @@ class MDBListAPI {
       // Derive base URL (scheme + host + path without query string).
       const parsedUrl = new URL(normalizedSearchUrl);
       const baseUrl = `${parsedUrl.origin}${parsedUrl.pathname}`;
+      const configuredLimit = Number.parseInt(
+        parsedUrl.searchParams.get('q_limit') ?? '',
+        10
+      );
+      const resultLimit =
+        Number.isFinite(configuredLimit) && configuredLimit > 0
+          ? configuredLimit
+          : undefined;
 
       // Warmup: acquire session cookies before making the search request.
       logger.debug(`[MDBList] Warming up session: GET ${baseUrl}`, {
@@ -707,8 +715,21 @@ class MDBListAPI {
         label: 'MDBList API',
       });
 
+      if (resultLimit && items.length >= resultLimit) {
+        items.splice(resultLimit);
+        logger.debug(
+          `[MDBList] Reached configured search result limit on page 1 (${resultLimit})`,
+          { label: 'MDBList API' }
+        );
+      }
+
       // Stop now if the forward button is already disabled (single page result).
-      if (isLastPage(page1Html)) {
+      if (resultLimit && items.length >= resultLimit) {
+        logger.debug(
+          '[MDBList] Pagination complete after honoring configured result limit.',
+          { label: 'MDBList API' }
+        );
+      } else if (isLastPage(page1Html)) {
         logger.debug('[MDBList] Single page result — pagination complete.', {
           label: 'MDBList API',
         });
@@ -759,12 +780,23 @@ class MDBListAPI {
             }
 
             items.push(...nextItems);
+            if (resultLimit && items.length >= resultLimit) {
+              items.splice(resultLimit);
+            }
             logger.debug(
               `[MDBList] Page ${pageIdx + 2} yielded ${
                 nextItems.length
               } items. Total: ${items.length}`,
               { label: 'MDBList API' }
             );
+
+            if (resultLimit && items.length >= resultLimit) {
+              logger.debug(
+                '[MDBList] Pagination complete after honoring configured result limit.',
+                { label: 'MDBList API' }
+              );
+              break;
+            }
 
             // Primary stop condition: forward button is disabled on this page.
             if (isLastPage(nextHtml)) {

@@ -1,0 +1,105 @@
+name: Docker Version Build
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Docker image version to publish (for example: 2.4.1 or v2.4.1)'
+        required: true
+        type: string
+      push_latest:
+        description: 'Also tag the image as latest'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  build-and-push:
+    name: Build and push linux/amd64 + linux/arm64
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      packages: write
+    env:
+      REGISTRY: ghcr.io
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve release variables
+        id: vars
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            raw_version="${{ inputs.version }}"
+            push_latest="${{ inputs.push_latest }}"
+          else
+            raw_version="${GITHUB_REF_NAME}"
+            push_latest="true"
+          fi
+
+          normalized_version="${raw_version#v}"
+          version_tag="v${normalized_version}"
+          image_name="$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
+
+          {
+            echo "image_name=${image_name}"
+            echo "normalized_version=${normalized_version}"
+            echo "version_tag=${version_tag}"
+            echo "push_latest=${push_latest}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Update package.json version for build metadata
+        run: npm version "${{ steps.vars.outputs.normalized_version }}" --no-git-tag-version
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare Docker tags
+        id: tags
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          image="${{ env.REGISTRY }}/${{ steps.vars.outputs.image_name }}"
+          tags="${image}:${{ steps.vars.outputs.version_tag }},${image}:${{ steps.vars.outputs.normalized_version }}"
+
+          if [[ "${{ steps.vars.outputs.push_latest }}" == "true" ]]; then
+            tags="${tags},${image}:latest"
+          fi
+
+          echo "tags=${tags}" >> "${GITHUB_OUTPUT}"
+
+      - name: Build and push multi-arch image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.tags.outputs.tags }}
+          build-args: |
+            COMMIT_TAG=${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.vars.outputs.version_tag }}
+
+      - name: Inspect published image
+        run: |
+          docker buildx imagetools inspect \
+            "${{ env.REGISTRY }}/${{ steps.vars.outputs.image_name }}:${{ steps.vars.outputs.version_tag }}"
