@@ -11,6 +11,7 @@ import {
   QueueListIcon,
   RectangleStackIcon,
   StarIcon,
+  TagIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
@@ -25,6 +26,7 @@ export const menuMessages = defineMessages({
   library: 'Library',
   allcollections: 'All Collections',
   posters: 'Posters',
+  editions: 'Editions',
   settings: 'Settings',
 });
 
@@ -91,6 +93,13 @@ const SidebarLinks: SidebarLinkProps[] = [
     svgIcon: <PhotoIcon className="mr-3 h-6 w-6" />,
     activeRegExp: /^\/posters/,
     dataTestId: 'sidebar-menu-posters',
+  },
+  {
+    href: '/editions',
+    messagesKey: 'editions',
+    svgIcon: <TagIcon className="mr-3 h-6 w-6" />,
+    activeRegExp: /^\/editions/,
+    dataTestId: 'sidebar-menu-editions',
   },
   {
     href: '/settings',
