@@ -206,13 +206,13 @@ export const startJobs = (): void => {
 
   scheduledJobs.push({
     id: 'plex-edition-manager',
-    name: 'Edition Manager (Full)',
+    name: 'Edition Manager (Full, Combined)',
     type: 'process',
     interval: 'fixed',
     cronSchedule: jobs['plex-edition-manager'].schedule,
     job: schedule.scheduleJob(jobs['plex-edition-manager'].schedule, () => {
-      logger.info('Starting scheduled job: Edition Manager (Full)', { label: 'Jobs' });
-      editionManager.run('full');
+      logger.info('Starting scheduled job: Edition Manager (Full, Combined)', { label: 'Jobs' });
+      editionManager.run('full', 'all');
     }),
     running: () => editionManager.status.running,
     cancelFn: () => editionManager.cancel(),
@@ -220,13 +220,69 @@ export const startJobs = (): void => {
 
   scheduledJobs.push({
     id: 'plex-edition-manager-incremental',
-    name: 'Edition Manager (Incremental)',
+    name: 'Edition Manager (Incremental, Combined)',
     type: 'process',
     interval: 'fixed',
     cronSchedule: jobs['plex-edition-manager-incremental'].schedule,
     job: schedule.scheduleJob(jobs['plex-edition-manager-incremental'].schedule, () => {
-      logger.info('Starting scheduled job: Edition Manager (Incremental)', { label: 'Jobs' });
-      editionManager.run('incremental');
+      logger.info('Starting scheduled job: Edition Manager (Incremental, Combined)', { label: 'Jobs' });
+      editionManager.run('incremental', 'all');
+    }),
+    running: () => editionManager.status.running,
+    cancelFn: () => editionManager.cancel(),
+  });
+
+  scheduledJobs.push({
+    id: 'plex-edition-manager-movies',
+    name: 'Edition Manager Movies (Full)',
+    type: 'process',
+    interval: 'fixed',
+    cronSchedule: jobs['plex-edition-manager-movies'].schedule,
+    job: schedule.scheduleJob(jobs['plex-edition-manager-movies'].schedule, () => {
+      logger.info('Starting scheduled job: Edition Manager Movies (Full)', { label: 'Jobs' });
+      editionManager.run('full', 'movies');
+    }),
+    running: () => editionManager.status.running,
+    cancelFn: () => editionManager.cancel(),
+  });
+
+  scheduledJobs.push({
+    id: 'plex-edition-manager-movies-incremental',
+    name: 'Edition Manager Movies (Incremental)',
+    type: 'process',
+    interval: 'fixed',
+    cronSchedule: jobs['plex-edition-manager-movies-incremental'].schedule,
+    job: schedule.scheduleJob(jobs['plex-edition-manager-movies-incremental'].schedule, () => {
+      logger.info('Starting scheduled job: Edition Manager Movies (Incremental)', { label: 'Jobs' });
+      editionManager.run('incremental', 'movies');
+    }),
+    running: () => editionManager.status.running,
+    cancelFn: () => editionManager.cancel(),
+  });
+
+  scheduledJobs.push({
+    id: 'plex-edition-manager-tv',
+    name: 'Edition Manager TV (Full)',
+    type: 'process',
+    interval: 'fixed',
+    cronSchedule: jobs['plex-edition-manager-tv'].schedule,
+    job: schedule.scheduleJob(jobs['plex-edition-manager-tv'].schedule, () => {
+      logger.info('Starting scheduled job: Edition Manager TV (Full)', { label: 'Jobs' });
+      editionManager.run('full', 'shows');
+    }),
+    running: () => editionManager.status.running,
+    cancelFn: () => editionManager.cancel(),
+  });
+
+  scheduledJobs.push({
+    id: 'plex-edition-manager-tv-incremental',
+    name: 'Edition Manager TV (Incremental)',
+    type: 'process',
+    interval: 'fixed',
+    cronSchedule: jobs['plex-edition-manager-tv-incremental'].schedule,
+    job: schedule.scheduleJob(jobs['plex-edition-manager-tv-incremental'].schedule, () => {
+      logger.info('Starting scheduled job: Edition Manager TV (Incremental)', { label: 'Jobs' });
+      editionManager.run('incremental', 'shows');
     }),
     running: () => editionManager.status.running,
     cancelFn: () => editionManager.cancel(),

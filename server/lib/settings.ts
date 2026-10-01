@@ -702,7 +702,11 @@ export type JobId =
   | 'watchlist-sync'
   | 'plex-delete-unlabelled-collections'
   | 'plex-edition-manager'
-  | 'plex-edition-manager-incremental';
+  | 'plex-edition-manager-incremental'
+  | 'plex-edition-manager-movies'
+  | 'plex-edition-manager-movies-incremental'
+  | 'plex-edition-manager-tv'
+  | 'plex-edition-manager-tv-incremental';
 
 export interface GlobalExclusions {
   movies: number[]; // TMDB IDs for excluded movies
@@ -803,10 +807,22 @@ class Settings {
           schedule: '0 0 4 * * 0', // Weekly at 4am Sunday (disabled by default — run manually)
         },
         'plex-edition-manager': {
-          schedule: '0 0 2 * * *', // Daily at 2am (full run)
+          schedule: '0 0 2 * * *', // Daily at 2am (full run, movies + shows)
         },
         'plex-edition-manager-incremental': {
           schedule: '0 0 2 * * *', // Daily at 2am (incremental — skips already-set editions)
+        },
+        'plex-edition-manager-movies': {
+          schedule: '0 0 3 * * *', // Daily at 3am (full run, movies only)
+        },
+        'plex-edition-manager-movies-incremental': {
+          schedule: '0 30 3 * * *', // Daily at 3:30am (incremental, movies only)
+        },
+        'plex-edition-manager-tv': {
+          schedule: '0 0 4 * * *', // Daily at 4am (full run, TV shows only)
+        },
+        'plex-edition-manager-tv-incremental': {
+          schedule: '0 30 4 * * *', // Daily at 4:30am (incremental, TV shows only)
         },
       },
       watchlistSync: {
