@@ -664,6 +664,8 @@ interface FullPublicSettings extends PublicSettings {
 
 interface JobSettings {
   schedule: string;
+  /** When false, the job stays listed but is skipped on its schedule. Manual runs still work. */
+  enabled: boolean;
 }
 
 export interface OverlaySettings {
@@ -784,45 +786,59 @@ class Settings {
       jobs: {
         'plex-refresh-token': {
           schedule: '0 0 5 * * *',
+          enabled: true,
         },
         'plex-collections-sync': {
           schedule: '0 0 */12 * * *',
+          enabled: true,
         },
         'plex-collections-quick-sync': {
           schedule: '0 */30 * * * *', // Every 30 minutes (user customizable)
+          enabled: true,
         },
         'plex-randomize-home-order': {
           schedule: '0 0 6 * * *',
+          enabled: true,
         },
         'overlay-application': {
           schedule: '0 0 3 * * *', // Every 24 hours at 3am
+          enabled: true,
         },
         'overlay-quick-sync': {
           schedule: '0 */30 * * * *', // Every 30 minutes (user customizable)
+          enabled: true,
         },
         'watchlist-sync': {
           schedule: '0 0 */6 * * *', // Every 6 hours
+          enabled: true,
         },
         'plex-delete-unlabelled-collections': {
           schedule: '0 0 4 * * 0', // Weekly at 4am Sunday (disabled by default — run manually)
+          enabled: false,
         },
         'plex-edition-manager': {
           schedule: '0 0 2 * * *', // Daily at 2am (full run, movies + shows)
+          enabled: true,
         },
         'plex-edition-manager-incremental': {
           schedule: '0 0 2 * * *', // Daily at 2am (incremental — skips already-set editions)
+          enabled: true,
         },
         'plex-edition-manager-movies': {
           schedule: '0 0 3 * * *', // Daily at 3am (full run, movies only)
+          enabled: true,
         },
         'plex-edition-manager-movies-incremental': {
           schedule: '0 30 3 * * *', // Daily at 3:30am (incremental, movies only)
+          enabled: true,
         },
         'plex-edition-manager-tv': {
           schedule: '0 0 4 * * *', // Daily at 4am (full run, TV shows only)
+          enabled: true,
         },
         'plex-edition-manager-tv-incremental': {
           schedule: '0 30 4 * * *', // Daily at 4:30am (incremental, TV shows only)
+          enabled: true,
         },
       },
       watchlistSync: {

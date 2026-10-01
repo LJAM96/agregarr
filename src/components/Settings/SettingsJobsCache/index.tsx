@@ -8,7 +8,7 @@ import Table from '@app/components/Common/Table';
 import useLocale from '@app/hooks/useLocale';
 import globalMessages from '@app/i18n/globalMessages';
 import { Transition } from '@headlessui/react';
-import { PlayIcon, StopIcon } from '@heroicons/react/24/outline';
+import { PlayIcon, PowerIcon, StopIcon } from '@heroicons/react/24/outline';
 import { PencilIcon } from '@heroicons/react/24/solid';
 import type { JobId } from '@server/lib/settings';
 import axios from 'axios';
@@ -29,6 +29,12 @@ const messages: { [messageName: string]: MessageDescriptor } = defineMessages({
   nextexecution: 'Next Execution',
   runnow: 'Run Now',
   canceljob: 'Cancel Job',
+  enablejob: 'Enable',
+  disablejob: 'Disable',
+  disabled: 'Disabled',
+  jobenabled: '{jobname} enabled.',
+  jobdisabled: '{jobname} disabled.',
+  jobtogglefailed: 'Something went wrong while updating the job.',
   jobstarted: '{jobname} started.',
   jobcancelled: '{jobname} canceled.',
   process: 'Process',
@@ -100,6 +106,7 @@ interface Job {
   nextExecutionTime: string;
   followingExecutionTime: string | null;
   running: boolean;
+  enabled: boolean;
 }
 
 type JobModalState = {
@@ -303,6 +310,29 @@ const SettingsJobs = () => {
         autoDismiss: true,
       }
     );
+    revalidate();
+  };
+
+  const toggleJob = async (job: Job) => {
+    try {
+      await axios.post(`/api/v1/settings/jobs/${job.id}/enabled`, {
+        enabled: !job.enabled,
+      });
+      addToast(
+        intl.formatMessage(job.enabled ? messages.jobdisabled : messages.jobenabled, {
+          jobname: intl.formatMessage(messages[job.id] ?? messages.unknownJob),
+        }),
+        {
+          appearance: 'success',
+          autoDismiss: true,
+        }
+      );
+    } catch {
+      addToast(intl.formatMessage(messages.jobtogglefailed), {
+        appearance: 'error',
+        autoDismiss: true,
+      });
+    }
     revalidate();
   };
 
@@ -631,6 +661,11 @@ const SettingsJobs = () => {
                       )}
                     </span>
                     {job.running && <Spinner className="ml-2 h-5 w-5" />}
+                    {!job.enabled && (
+                      <Badge badgeType="danger" className="ml-2 uppercase">
+                        {intl.formatMessage(messages.disabled)}
+                      </Badge>
+                    )}
                   </div>
                 </Table.TD>
                 <Table.TD>
@@ -644,7 +679,13 @@ const SettingsJobs = () => {
                   </Badge>
                 </Table.TD>
                 <Table.TD>
-                  {(() => {
+                  {!job.enabled ? (
+                    <div className="text-sm leading-5 text-gray-500">
+                      {intl.formatMessage(messages.disabled)}
+                    </div>
+                  ) : (
+                    <>
+                      {(() => {
                     const secondsUntilNext = Math.floor(
                       (new Date(job.nextExecutionTime).getTime() - Date.now()) /
                         1000
@@ -726,6 +767,8 @@ const SettingsJobs = () => {
                         );
                       }
                     })()}
+                    </>
+                  )}
                 </Table.TD>
                 <Table.TD alignText="right">
                   <Button
@@ -735,6 +778,23 @@ const SettingsJobs = () => {
                   >
                     <PencilIcon />
                     <span>{intl.formatMessage(globalMessages.edit)}</span>
+                  </Button>
+                  <Button
+                    className="mr-2"
+                    buttonType={job.enabled ? 'default' : 'primary'}
+                    onClick={() => toggleJob(job)}
+                    title={
+                      job.enabled
+                        ? 'Stop this job running on its schedule (manual runs still work)'
+                        : 'Resume this job running on its schedule'
+                    }
+                  >
+                    <PowerIcon />
+                    <span>
+                      {intl.formatMessage(
+                        job.enabled ? messages.disablejob : messages.enablejob
+                      )}
+                    </span>
                   </Button>
                   {job.running ? (
                     <Button buttonType="danger" onClick={() => cancelJob(job)}>

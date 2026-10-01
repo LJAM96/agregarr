@@ -5197,6 +5197,9 @@ components:
         running:
           type: boolean
           example: false
+        enabled:
+          type: boolean
+          example: true
     Keyword:
       type: object
       properties:
@@ -11215,6 +11218,36 @@ paths:
       responses:
         '200':
           description: Rescheduled job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+  /settings/jobs/{jobId}/enabled:
+    post:
+      summary: Enable or disable a job schedule
+      description: Enables or disables a job's schedule. Disabled jobs are skipped on their schedule but can still be run manually. Will return the job in JSON format.
+      tags:
+        - settings-system
+      parameters:
+        - in: path
+          name: jobId
+          required: true
+          description: The unique identifier of the job.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+                  example: false
+      responses:
+        '200':
+          description: Updated job
           content:
             application/json:
               schema:

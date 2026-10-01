@@ -22,15 +22,54 @@ interface ScheduledJob {
   type: 'process' | 'command';
   interval: 'seconds' | 'minutes' | 'hours' | 'fixed';
   cronSchedule: string;
+  /** Ungated runner — used for manual runs, bypasses the enabled flag. */
+  run: () => void;
   running?: () => boolean;
   cancelFn?: () => void;
 }
 
 export const scheduledJobs: ScheduledJob[] = [];
 
-export const startJobs = (): void => {
-  const jobs = getSettings().jobs;
+interface RegisterJobOptions {
+  id: JobId;
+  name: string;
+  type: 'process' | 'command';
+  interval: 'seconds' | 'minutes' | 'hours' | 'fixed';
+  run: () => void;
+  running?: () => boolean;
+  cancelFn?: () => void;
+}
 
+/**
+ * Register a scheduled job. The schedule always stays registered (so the job
+ * stays listed and Run Now keeps working), but scheduled ticks are skipped
+ * while the job is disabled in settings. Manual runs bypass the gate.
+ */
+const registerJob = (opts: RegisterJobOptions): void => {
+  const cronSchedule = getSettings().jobs[opts.id].schedule;
+  const gatedRun = (): void => {
+    if (getSettings().jobs[opts.id]?.enabled === false) {
+      logger.debug(`Skipping scheduled job: ${opts.name} (disabled)`, {
+        label: 'Jobs',
+      });
+      return;
+    }
+    opts.run();
+  };
+  scheduledJobs.push({
+    id: opts.id,
+    name: opts.name,
+    type: opts.type,
+    interval: opts.interval,
+    cronSchedule,
+    job: schedule.scheduleJob(cronSchedule, gatedRun),
+    run: opts.run,
+    running: opts.running,
+    cancelFn: opts.cancelFn,
+  });
+};
+
+export const startJobs = (): void => {
   // Plex Recently Added Scan removed - not needed for collections-only app
 
   // Plex Full Library Scan removed - not needed for collections-only app
@@ -41,13 +80,12 @@ export const startJobs = (): void => {
 
   // Media Availability Sync removed - not needed for collections-only app
 
-  scheduledJobs.push({
+  registerJob({
     id: 'plex-collections-sync',
     name: 'Plex Collections Sync',
     type: 'process',
     interval: 'hours',
-    cronSchedule: jobs['plex-collections-sync'].schedule,
-    job: schedule.scheduleJob(jobs['plex-collections-sync'].schedule, () => {
+    run: () => {
       // Check if any collections are configured before running
       const settings = getSettings();
       const hasCollections =
@@ -68,102 +106,90 @@ export const startJobs = (): void => {
         label: 'Jobs',
       });
       collectionsSync.run();
-    }),
+    },
     running: () => collectionsSync.status.running,
     cancelFn: () => collectionsSync.cancel(),
   });
 
-  scheduledJobs.push({
+  registerJob({
     id: 'plex-collections-quick-sync',
     name: 'Collections Quick Sync',
     type: 'process',
     interval: 'minutes',
-    cronSchedule: jobs['plex-collections-quick-sync'].schedule,
-    job: schedule.scheduleJob(
-      jobs['plex-collections-quick-sync'].schedule,
-      () => {
-        logger.info('Starting scheduled job: Collections Quick Sync', {
-          label: 'Jobs',
-        });
-        collectionsQuickSync.run();
-      }
-    ),
+    run: () => {
+      logger.info('Starting scheduled job: Collections Quick Sync', {
+        label: 'Jobs',
+      });
+      collectionsQuickSync.run();
+    },
     running: () => collectionsQuickSync.status.running,
     cancelFn: () => collectionsQuickSync.cancel(),
   });
 
-  scheduledJobs.push({
+  registerJob({
     id: 'plex-randomize-home-order',
     name: 'Plex Randomize Home Order',
     type: 'process',
     interval: 'minutes',
-    cronSchedule: jobs['plex-randomize-home-order'].schedule,
-    job: schedule.scheduleJob(
-      jobs['plex-randomize-home-order'].schedule,
-      () => {
-        logger.info('Starting scheduled job: Plex Randomize Home Order', {
-          label: 'Jobs',
-        });
-        randomizeHomeOrder.run();
-      }
-    ),
+    run: () => {
+      logger.info('Starting scheduled job: Plex Randomize Home Order', {
+        label: 'Jobs',
+      });
+      randomizeHomeOrder.run();
+    },
     running: () => randomizeHomeOrder.status.running,
     cancelFn: () => randomizeHomeOrder.cancel(),
   });
 
-  scheduledJobs.push({
+  registerJob({
     id: 'overlay-application',
     name: 'Overlay Application',
     type: 'process',
     interval: 'hours',
-    cronSchedule: jobs['overlay-application'].schedule,
-    job: schedule.scheduleJob(jobs['overlay-application'].schedule, () => {
+    run: () => {
       logger.info('Starting scheduled job: Overlay Application', {
         label: 'Jobs',
       });
       overlayApplication.run();
-    }),
+    },
     running: () => overlayApplication.status.running,
     cancelFn: () => overlayApplication.cancel(),
   });
 
-  scheduledJobs.push({
+  registerJob({
     id: 'overlay-quick-sync',
     name: 'Overlay Quick Sync',
     type: 'process',
     interval: 'minutes',
-    cronSchedule: jobs['overlay-quick-sync'].schedule,
-    job: schedule.scheduleJob(jobs['overlay-quick-sync'].schedule, () => {
+    run: () => {
       logger.info('Starting scheduled job: Overlay Quick Sync', {
         label: 'Jobs',
       });
       overlaysQuickSync.run();
-    }),
+    },
     running: () => overlaysQuickSync.status.running,
     cancelFn: () => overlaysQuickSync.cancel(),
   });
 
-  scheduledJobs.push({
+  registerJob({
     id: 'plex-refresh-token',
     name: 'Plex Refresh Token',
     type: 'process',
     interval: 'fixed',
-    cronSchedule: jobs['plex-refresh-token'].schedule,
-    job: schedule.scheduleJob(jobs['plex-refresh-token'].schedule, () => {
+    run: () => {
       logger.info('Starting scheduled job: Plex Refresh Token', {
         label: 'Jobs',
       });
       refreshToken.run();
-    }),
+    },
   });
 
-  scheduledJobs.push({
+  registerJob({
     id: 'watchlist-sync',
     name: 'Plex Watchlist Sync',
     type: 'process',
     interval: 'hours',
-    cronSchedule: jobs['watchlist-sync'].schedule,
-    job: schedule.scheduleJob(jobs['watchlist-sync'].schedule, () => {
+    run: () => {
       // Check if watchlist sync is enabled
       const settings = getSettings();
       const syncSettings = settings.watchlistSync;
@@ -179,111 +205,100 @@ export const startJobs = (): void => {
         label: 'Jobs',
       });
       watchlistSync.run();
-    }),
+    },
     running: () => watchlistSync.status.running,
     cancelFn: () => watchlistSync.cancel(),
   });
 
-  scheduledJobs.push({
+  registerJob({
     id: 'plex-delete-unlabelled-collections',
     name: 'Delete Unlabelled Collections',
     type: 'process',
     interval: 'fixed',
-    cronSchedule: jobs['plex-delete-unlabelled-collections'].schedule,
-    job: schedule.scheduleJob(
-      jobs['plex-delete-unlabelled-collections'].schedule,
-      () => {
-        logger.info(
-          'Starting scheduled job: Delete Unlabelled Collections',
-          { label: 'Jobs' }
-        );
-        deleteUnlabelledCollections.run();
-      }
-    ),
+    run: () => {
+      logger.info('Starting scheduled job: Delete Unlabelled Collections', {
+        label: 'Jobs',
+      });
+      deleteUnlabelledCollections.run();
+    },
     running: () => deleteUnlabelledCollections.status.running,
     cancelFn: () => deleteUnlabelledCollections.cancel(),
   });
 
-  scheduledJobs.push({
+  registerJob({
     id: 'plex-edition-manager',
     name: 'Edition Manager (Full, Combined)',
     type: 'process',
     interval: 'fixed',
-    cronSchedule: jobs['plex-edition-manager'].schedule,
-    job: schedule.scheduleJob(jobs['plex-edition-manager'].schedule, () => {
+    run: () => {
       logger.info('Starting scheduled job: Edition Manager (Full, Combined)', { label: 'Jobs' });
       editionManager.run('full', 'all');
-    }),
+    },
     running: () => editionManager.status.running,
     cancelFn: () => editionManager.cancel(),
   });
 
-  scheduledJobs.push({
+  registerJob({
     id: 'plex-edition-manager-incremental',
     name: 'Edition Manager (Incremental, Combined)',
     type: 'process',
     interval: 'fixed',
-    cronSchedule: jobs['plex-edition-manager-incremental'].schedule,
-    job: schedule.scheduleJob(jobs['plex-edition-manager-incremental'].schedule, () => {
+    run: () => {
       logger.info('Starting scheduled job: Edition Manager (Incremental, Combined)', { label: 'Jobs' });
       editionManager.run('incremental', 'all');
-    }),
+    },
     running: () => editionManager.status.running,
     cancelFn: () => editionManager.cancel(),
   });
 
-  scheduledJobs.push({
+  registerJob({
     id: 'plex-edition-manager-movies',
     name: 'Edition Manager Movies (Full)',
     type: 'process',
     interval: 'fixed',
-    cronSchedule: jobs['plex-edition-manager-movies'].schedule,
-    job: schedule.scheduleJob(jobs['plex-edition-manager-movies'].schedule, () => {
+    run: () => {
       logger.info('Starting scheduled job: Edition Manager Movies (Full)', { label: 'Jobs' });
       editionManager.run('full', 'movies');
-    }),
+    },
     running: () => editionManager.status.running,
     cancelFn: () => editionManager.cancel(),
   });
 
-  scheduledJobs.push({
+  registerJob({
     id: 'plex-edition-manager-movies-incremental',
     name: 'Edition Manager Movies (Incremental)',
     type: 'process',
     interval: 'fixed',
-    cronSchedule: jobs['plex-edition-manager-movies-incremental'].schedule,
-    job: schedule.scheduleJob(jobs['plex-edition-manager-movies-incremental'].schedule, () => {
+    run: () => {
       logger.info('Starting scheduled job: Edition Manager Movies (Incremental)', { label: 'Jobs' });
       editionManager.run('incremental', 'movies');
-    }),
+    },
     running: () => editionManager.status.running,
     cancelFn: () => editionManager.cancel(),
   });
 
-  scheduledJobs.push({
+  registerJob({
     id: 'plex-edition-manager-tv',
     name: 'Edition Manager TV (Full)',
     type: 'process',
     interval: 'fixed',
-    cronSchedule: jobs['plex-edition-manager-tv'].schedule,
-    job: schedule.scheduleJob(jobs['plex-edition-manager-tv'].schedule, () => {
+    run: () => {
       logger.info('Starting scheduled job: Edition Manager TV (Full)', { label: 'Jobs' });
       editionManager.run('full', 'shows');
-    }),
+    },
     running: () => editionManager.status.running,
     cancelFn: () => editionManager.cancel(),
   });
 
-  scheduledJobs.push({
+  registerJob({
     id: 'plex-edition-manager-tv-incremental',
     name: 'Edition Manager TV (Incremental)',
     type: 'process',
     interval: 'fixed',
-    cronSchedule: jobs['plex-edition-manager-tv-incremental'].schedule,
-    job: schedule.scheduleJob(jobs['plex-edition-manager-tv-incremental'].schedule, () => {
+    run: () => {
       logger.info('Starting scheduled job: Edition Manager TV (Incremental)', { label: 'Jobs' });
       editionManager.run('incremental', 'shows');
-    }),
+    },
     running: () => editionManager.status.running,
     cancelFn: () => editionManager.cancel(),
   });

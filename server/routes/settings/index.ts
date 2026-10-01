@@ -1102,37 +1102,38 @@ settingsRoutes.get(
   }
 );
 
+const getJobStatus = (job: (typeof scheduledJobs)[number]) => {
+  const nextExecution = job.job.nextInvocation();
+  let followingExecution: Date | null = null;
+
+  if (nextExecution && job.cronSchedule) {
+    try {
+      // Add 1 second to nextExecution to ensure we get the occurrence AFTER it
+      const startDate = new Date(new Date(nextExecution).getTime() + 1000);
+      const interval = parser.parse(job.cronSchedule, {
+        currentDate: startDate,
+      });
+      followingExecution = interval.next().toDate(); // Get execution AFTER nextExecution
+    } catch (error) {
+      // If cron parsing fails, followingExecution stays null
+    }
+  }
+
+  return {
+    id: job.id,
+    name: job.name,
+    type: job.type,
+    interval: job.interval,
+    cronSchedule: job.cronSchedule,
+    nextExecutionTime: nextExecution,
+    followingExecutionTime: followingExecution,
+    running: job.running ? job.running() : false,
+    enabled: getSettings().jobs[job.id]?.enabled !== false,
+  };
+};
+
 settingsRoutes.get('/jobs', (_req, res) => {
-  return res.status(200).json(
-    scheduledJobs.map((job) => {
-      const nextExecution = job.job.nextInvocation();
-      let followingExecution: Date | null = null;
-
-      if (nextExecution && job.cronSchedule) {
-        try {
-          // Add 1 second to nextExecution to ensure we get the occurrence AFTER it
-          const startDate = new Date(new Date(nextExecution).getTime() + 1000);
-          const interval = parser.parse(job.cronSchedule, {
-            currentDate: startDate,
-          });
-          followingExecution = interval.next().toDate(); // Get execution AFTER nextExecution
-        } catch (error) {
-          // If cron parsing fails, followingExecution stays null
-        }
-      }
-
-      return {
-        id: job.id,
-        name: job.name,
-        type: job.type,
-        interval: job.interval,
-        cronSchedule: job.cronSchedule,
-        nextExecutionTime: nextExecution,
-        followingExecutionTime: followingExecution,
-        running: job.running ? job.running() : false,
-      };
-    })
-  );
+  return res.status(200).json(scheduledJobs.map(getJobStatus));
 });
 
 settingsRoutes.post<{ jobId: string }>('/jobs/:jobId/run', (req, res, next) => {
@@ -1142,35 +1143,46 @@ settingsRoutes.post<{ jobId: string }>('/jobs/:jobId/run', (req, res, next) => {
     return next({ status: 404, message: 'Job not found.' });
   }
 
-  scheduledJob.job.invoke();
-
-  const nextExecution = scheduledJob.job.nextInvocation();
-  let followingExecution: Date | null = null;
-
-  if (nextExecution && scheduledJob.cronSchedule) {
-    try {
-      // Add 1 second to nextExecution to ensure we get the occurrence AFTER it
-      const startDate = new Date(new Date(nextExecution).getTime() + 1000);
-      const interval = parser.parse(scheduledJob.cronSchedule, {
-        currentDate: startDate,
-      });
-      followingExecution = interval.next().toDate(); // Get execution AFTER nextExecution
-    } catch (error) {
-      // If cron parsing fails, followingExecution stays null
-    }
+  // Manual runs bypass the enabled gate — disabling only stops the schedule.
+  if (scheduledJob.run) {
+    scheduledJob.run();
+  } else {
+    scheduledJob.job.invoke();
   }
 
-  return res.status(200).json({
-    id: scheduledJob.id,
-    name: scheduledJob.name,
-    type: scheduledJob.type,
-    interval: scheduledJob.interval,
-    cronSchedule: scheduledJob.cronSchedule,
-    nextExecutionTime: nextExecution,
-    followingExecutionTime: followingExecution,
-    running: scheduledJob.running ? scheduledJob.running() : false,
-  });
+  return res.status(200).json(getJobStatus(scheduledJob));
 });
+
+settingsRoutes.post<{ jobId: JobId }>(
+  '/jobs/:jobId/enabled',
+  (req, res, next) => {
+    const scheduledJob = scheduledJobs.find(
+      (job) => job.id === req.params.jobId
+    );
+
+    if (!scheduledJob) {
+      return next({ status: 404, message: 'Job not found.' });
+    }
+
+    if (typeof req.body?.enabled !== 'boolean') {
+      return next({
+        status: 400,
+        message: 'Invalid enabled flag. Must be true or false.',
+      });
+    }
+
+    const settings = getSettings();
+    settings.jobs[scheduledJob.id].enabled = req.body.enabled;
+    settings.save();
+
+    logger.info(
+      `${req.body.enabled ? 'Enabled' : 'Disabled'} job: ${scheduledJob.name}`,
+      { label: 'Jobs' }
+    );
+
+    return res.status(200).json(getJobStatus(scheduledJob));
+  }
+);
 
 settingsRoutes.post<{ jobId: JobId }>(
   '/jobs/:jobId/cancel',
@@ -1187,32 +1199,7 @@ settingsRoutes.post<{ jobId: JobId }>(
       scheduledJob.cancelFn();
     }
 
-    const nextExecution = scheduledJob.job.nextInvocation();
-    let followingExecution: Date | null = null;
-
-    if (nextExecution && scheduledJob.cronSchedule) {
-      try {
-        // Add 1 second to nextExecution to ensure we get the occurrence AFTER it
-        const startDate = new Date(new Date(nextExecution).getTime() + 1000);
-        const interval = parser.parse(scheduledJob.cronSchedule, {
-          currentDate: startDate,
-        });
-        followingExecution = interval.next().toDate(); // Get execution AFTER nextExecution
-      } catch (error) {
-        // If cron parsing fails, followingExecution stays null
-      }
-    }
-
-    return res.status(200).json({
-      id: scheduledJob.id,
-      name: scheduledJob.name,
-      type: scheduledJob.type,
-      interval: scheduledJob.interval,
-      cronSchedule: scheduledJob.cronSchedule,
-      nextExecutionTime: nextExecution,
-      followingExecutionTime: followingExecution,
-      running: scheduledJob.running ? scheduledJob.running() : false,
-    });
+    return res.status(200).json(getJobStatus(scheduledJob));
   }
 );
 
@@ -1236,32 +1223,7 @@ settingsRoutes.post<{ jobId: JobId }>(
 
       scheduledJob.cronSchedule = req.body.schedule;
 
-      const nextExecution = scheduledJob.job.nextInvocation();
-      let followingExecution: Date | null = null;
-
-      if (nextExecution && scheduledJob.cronSchedule) {
-        try {
-          // Add 1 second to nextExecution to ensure we get the occurrence AFTER it
-          const startDate = new Date(new Date(nextExecution).getTime() + 1000);
-          const interval = parser.parse(scheduledJob.cronSchedule, {
-            currentDate: startDate,
-          });
-          followingExecution = interval.next().toDate(); // Get execution AFTER nextExecution
-        } catch (error) {
-          // If cron parsing fails, followingExecution stays null
-        }
-      }
-
-      return res.status(200).json({
-        id: scheduledJob.id,
-        name: scheduledJob.name,
-        type: scheduledJob.type,
-        interval: scheduledJob.interval,
-        cronSchedule: scheduledJob.cronSchedule,
-        nextExecutionTime: nextExecution,
-        followingExecutionTime: followingExecution,
-        running: scheduledJob.running ? scheduledJob.running() : false,
-      });
+      return res.status(200).json(getJobStatus(scheduledJob));
     } else {
       return next({
         status: 400,
