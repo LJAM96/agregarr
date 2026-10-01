@@ -936,6 +936,68 @@ collectionsRoutes.put('/:id/settings', isAuthenticated(), async (req, res) => {
 });
 
 /**
+ * PUT /api/v1/collections/:id/lock
+ * Lock or unlock a collection to protect it from automatic deletion.
+ * Locked collections survive orphaned library cleanup, missing cleanup,
+ * and inactive removal even when their library becomes inaccessible.
+ */
+collectionsRoutes.put('/:id/lock', isAuthenticated(), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { isLocked } = req.body as { isLocked?: boolean };
+
+    if (typeof isLocked !== 'boolean') {
+      return res.status(400).json({
+        error: 'Invalid request: isLocked must be a boolean',
+      });
+    }
+
+    const settings = getSettings();
+    const configs = settings.plex.collectionConfigs || [];
+    const configIndex = configs.findIndex((c) => c.id === id);
+
+    if (configIndex === -1) {
+      return res.status(404).json({
+        error: 'Collection not found',
+        message: `Collection with id "${id}" not found`,
+      });
+    }
+
+    const updatedConfig = {
+      ...configs[configIndex],
+      isLocked,
+      lastModifiedAt: new Date().toISOString(),
+    };
+    configs[configIndex] = updatedConfig;
+    settings.plex.collectionConfigs = configs;
+    settings.save();
+
+    logger.info(
+      `${isLocked ? 'Locked' : 'Unlocked'} collection: ${updatedConfig.name}`,
+      {
+        label: 'Collections API',
+        configId: id,
+      }
+    );
+
+    return res.status(200).json({
+      collectionConfig: updatedConfig,
+      message: `Collection ${isLocked ? 'locked' : 'unlocked'} successfully`,
+    });
+  } catch (error) {
+    logger.error('Failed to update collection lock status', {
+      label: 'Collections API',
+      error: error instanceof Error ? error.message : String(error),
+      configId: req.params.id,
+    });
+
+    return res.status(500).json({
+      error: 'Failed to update collection lock status',
+    });
+  }
+});
+
+/**
  * DELETE /api/v1/collections/cleanup-missing
  * Remove all collection configs where missing: true and delete them from Plex hubs
  */
@@ -972,13 +1034,27 @@ collectionsRoutes.delete(
         });
       }
 
-      // Remove missing collections and delete from hubs
+      // Remove missing collections and delete from hubs (locked configs are skipped)
+      let lockedSkippedCount = 0;
       const missingCollections = (settings.plex.collectionConfigs || []).filter(
-        (config) => config.missing === true
+        (config) => config.missing === true && !config.isLocked
       );
+      lockedSkippedCount += (
+        settings.plex.collectionConfigs || []
+      ).filter((config) => config.missing === true && config.isLocked).length;
       const filteredCollections = (
         settings.plex.collectionConfigs || []
       ).filter((config) => {
+        if (config.isLocked && config.missing === true) {
+          logger.info(
+            `Skipping locked missing collection during cleanup: ${config.name}`,
+            {
+              label: 'Collections API - Cleanup',
+              configId: config.id,
+            }
+          );
+          return true;
+        }
         const shouldRemove = config.missing === true;
         if (shouldRemove) {
           cleanupCount++;
@@ -1025,8 +1101,21 @@ collectionsRoutes.delete(
         }
       }
 
-      // Remove missing hubs
+      // Remove missing hubs (locked hubs are skipped)
+      lockedSkippedCount += (settings.plex.hubConfigs || []).filter(
+        (config) => config.missing === true && config.isLocked
+      ).length;
       const filteredHubs = (settings.plex.hubConfigs || []).filter((config) => {
+        if (config.isLocked && config.missing === true) {
+          logger.info(
+            `Skipping locked missing hub during cleanup: ${config.name}`,
+            {
+              label: 'Collections API - Cleanup',
+              configId: config.id,
+            }
+          );
+          return true;
+        }
         const shouldRemove = config.missing === true;
         if (shouldRemove) {
           cleanupCount++;
@@ -1039,14 +1128,27 @@ collectionsRoutes.delete(
         return !shouldRemove;
       });
 
-      // Remove missing pre-existing collections and delete from hubs
+      // Remove missing pre-existing collections and delete from hubs (locked configs are skipped)
       const missingPreExisting = (
         settings.plex.preExistingCollectionConfigs || []
-      ).filter((config) => config.missing === true);
+      ).filter((config) => config.missing === true && !config.isLocked);
+      lockedSkippedCount += (
+        settings.plex.preExistingCollectionConfigs || []
+      ).filter((config) => config.missing === true && config.isLocked).length;
 
       const filteredPreExisting = (
         settings.plex.preExistingCollectionConfigs || []
       ).filter((config) => {
+        if (config.isLocked && config.missing === true) {
+          logger.info(
+            `Skipping locked missing pre-existing collection during cleanup: ${config.name}`,
+            {
+              label: 'Collections API - Cleanup',
+              configId: config.id,
+            }
+          );
+          return true;
+        }
         const shouldRemove = config.missing === true;
         if (shouldRemove) {
           cleanupCount++;
@@ -1107,13 +1209,21 @@ collectionsRoutes.delete(
         hubDeleteCount > 0
           ? `${cleanupCount} missing collection configuration${
               cleanupCount !== 1 ? 's' : ''
-            } removed successfully (${hubDeleteCount} also deleted from Plex hubs)`
+            } removed successfully (${hubDeleteCount} also deleted from Plex hubs)${
+              lockedSkippedCount > 0
+                ? ` (${lockedSkippedCount} locked skipped)`
+                : ''
+            }`
           : `${cleanupCount} missing collection configuration${
               cleanupCount !== 1 ? 's' : ''
-            } removed successfully`;
+            } removed successfully${
+              lockedSkippedCount > 0
+                ? ` (${lockedSkippedCount} locked skipped)`
+                : ''
+            }`;
 
       logger.info(
-        `Cleanup complete: ${cleanupCount} missing collection configurations removed, ${hubDeleteCount} deleted from Plex hubs`,
+        `Cleanup complete: ${cleanupCount} missing collection configurations removed, ${hubDeleteCount} deleted from Plex hubs, ${lockedSkippedCount} locked skipped`,
         {
           label: 'Collections API - Cleanup',
         }
@@ -1123,6 +1233,7 @@ collectionsRoutes.delete(
         message,
         cleanupCount,
         hubDeleteCount,
+        lockedSkippedCount,
       });
     } catch (error) {
       logger.error('Failed to cleanup missing collections', {
@@ -1157,6 +1268,16 @@ collectionsRoutes.delete('/:id', isAuthenticated(), async (req, res) => {
       });
     }
 
+    // Locked collections require explicit force to delete
+    const forceDelete = req.query.force === 'true';
+    const lockedConfigs = [configToDelete].filter((c) => c.isLocked);
+    if (lockedConfigs.length > 0 && !forceDelete) {
+      return res.status(423).json({
+        error: 'Collection is locked',
+        message: `Collection "${configToDelete.name}" is locked and protected from deletion. Unlock it first or retry with ?force=true.`,
+      });
+    }
+
     // Check if this is a linked collection - if so, delete all linked configs
     const configsToDelete = [];
     if (configToDelete.isLinked && configToDelete.linkId) {
@@ -1167,6 +1288,17 @@ collectionsRoutes.delete('/:id', isAuthenticated(), async (req, res) => {
       configsToDelete.push(...linkedConfigs);
     } else {
       configsToDelete.push(configToDelete);
+    }
+
+    // Block deletion of locked linked siblings unless forced
+    const lockedInGroup = configsToDelete.filter((c) => c.isLocked);
+    if (lockedInGroup.length > 0 && !forceDelete) {
+      return res.status(423).json({
+        error: 'Locked collection in linked group',
+        message: `${lockedInGroup.length} locked collection(s) in this linked group (${lockedInGroup
+          .map((c) => `"${c.name}"`)
+          .join(', ')}) are protected from deletion. Unlock them first or retry with ?force=true.`,
+      });
     }
 
     // Clean up labels for smart collections before deletion

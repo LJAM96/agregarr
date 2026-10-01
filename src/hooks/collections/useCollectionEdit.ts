@@ -259,7 +259,16 @@ export const useCollectionEdit = () => {
         revalidateCollections(); // Revalidate SWR cache
       }
     } catch (error) {
-      addToast('Failed to delete collection.', {
+      let message = 'Failed to delete collection.';
+      if (axios.isAxiosError(error)) {
+        const backendMessage = (
+          error.response?.data as { message?: string } | undefined
+        )?.message;
+        if (backendMessage) {
+          message = backendMessage;
+        }
+      }
+      addToast(message, {
         appearance: 'error',
         autoDismiss: true,
       });

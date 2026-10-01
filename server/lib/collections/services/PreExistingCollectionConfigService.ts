@@ -60,6 +60,8 @@ export class PreExistingCollectionConfigService {
             false,
           visibilityConfig: newConfig.visibilityConfig,
           isActive: existingConfig?.isActive ?? true,
+          // Preserve existing lock status
+          isLocked: newConfig.isLocked ?? existingConfig?.isLocked ?? false,
           // Copy linking fields from discovered config (if present)
           collectionType: newConfig.collectionType,
           isLinked: newConfig.isLinked,

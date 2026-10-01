@@ -5,6 +5,7 @@ import {
   getVisibilityIcons,
   LibraryBadge,
   LinkIcon as CollectionLinkIcon,
+  LockedIndicator,
   MissingIndicator,
   MissingItemsBadge,
   PlaceholdersBadge,
@@ -397,8 +398,31 @@ const AllCollectionsView: React.FC = () => {
   const handleDelete = async (collection: DisplayCollection) => {
     if (collection.type === 'collection' && collection.originalConfig) {
       const config = collection.originalConfig as CollectionFormConfig;
+      if (config.isLocked) {
+        addToast(
+          `Collection "${config.name}" is locked and protected from deletion. Unlock it first.`,
+          {
+            autoDismiss: true,
+            appearance: 'error',
+          }
+        );
+        return;
+      }
       if (config.id) {
-        await deleteCollectionConfig(config.id);
+        try {
+          await deleteCollectionConfig(config.id);
+        } catch (error) {
+          if (axios.isAxiosError(error) && error.response?.status === 423) {
+            addToast(
+              (error.response.data as { message?: string })?.message ||
+                'Collection is locked and protected from deletion.',
+              {
+                autoDismiss: true,
+                appearance: 'error',
+              }
+            );
+          }
+        }
       }
     } else if (collection.type === 'hub' && collection.originalConfig) {
       // Hide hub by setting all visibility to false
@@ -889,6 +913,9 @@ const AllCollectionsView: React.FC = () => {
                     missing={collection.originalConfig.missing}
                     configType={collection.configType}
                   />
+
+                  {/* Locked indicator - protected from automatic deletion */}
+                  <LockedIndicator isLocked={collection.originalConfig.isLocked} />
 
                   {/* Visibility icons */}
                   {getVisibilityIcons(visibilityConfig, timeRestriction)}

@@ -119,6 +119,49 @@ defaultHubsRoutes.put('/:id/settings', isAuthenticated(), async (req, res) => {
 });
 
 /**
+ * PUT /api/v1/defaulthubs/:id/lock
+ * Lock or unlock a hub to protect it from automatic deletion.
+ */
+defaultHubsRoutes.put('/:id/lock', isAuthenticated(), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { isLocked } = req.body as { isLocked?: boolean };
+
+    if (typeof isLocked !== 'boolean') {
+      return res.status(400).json({
+        error: 'Invalid request: isLocked must be a boolean',
+      });
+    }
+
+    const updatedConfig = defaultHubConfigService.updateSettings(id, {
+      isLocked,
+    });
+
+    res.status(200).json({
+      hubConfig: updatedConfig,
+      message: `Hub ${isLocked ? 'locked' : 'unlocked'} successfully`,
+    });
+  } catch (error) {
+    logger.error('Failed to update hub lock status', {
+      label: 'Default Hubs API',
+      error: error instanceof Error ? error.message : String(error),
+      configId: req.params.id,
+    });
+
+    if (error instanceof Error && error.message === 'Config not found') {
+      return res.status(404).json({
+        error: 'Hub not found',
+        message: `Hub with id "${req.params.id}" not found`,
+      });
+    }
+
+    res.status(500).json({
+      error: 'Failed to update hub lock status',
+    });
+  }
+});
+
+/**
  * POST /api/v1/defaulthubs/discover
  * Discovery operation for new default hubs
  */

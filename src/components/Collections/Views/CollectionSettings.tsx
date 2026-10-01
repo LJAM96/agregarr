@@ -1198,6 +1198,18 @@ const CollectionSettings = ({
       return;
     }
 
+    // Block deletion of locked collections (backend also returns 423)
+    if (configToDelete.isLocked) {
+      addToast(
+        `Collection "${configToDelete.name}" is locked and protected from deletion. Unlock it first.`,
+        {
+          autoDismiss: true,
+          appearance: 'error',
+        }
+      );
+      return;
+    }
+
     // Determine which configs will be deleted (for UI state updates)
     let configIdsToDelete: string[] = [configId];
 
@@ -1213,6 +1225,19 @@ const CollectionSettings = ({
               c.id !== configId
           )
         : [];
+
+    // Block if any linked sibling is locked
+    const lockedSibling = linkedConfigs.find((c) => c.isLocked);
+    if (lockedSibling) {
+      addToast(
+        `Linked collection "${lockedSibling.name}" is locked. Unlock all collections in this linked group first.`,
+        {
+          autoDismiss: true,
+          appearance: 'error',
+        }
+      );
+      return;
+    }
 
     if (linkedConfigs.length > 0) {
       // This is a linked collection - all linked configs will be deleted by backend
@@ -1278,7 +1303,80 @@ const CollectionSettings = ({
         });
       }
     } catch (error) {
+      // Surface lock errors from backend (423) since optimistic update already ran
+      if (axios.isAxiosError(error) && error.response?.status === 423) {
+        addToast(
+          (error.response.data as { message?: string })?.message ||
+            'Collection is locked and protected from deletion.',
+          {
+            autoDismiss: true,
+            appearance: 'error',
+          }
+        );
+      }
       // Error already handled in saveCollectionConfigs
+    }
+  };
+
+  const toggleLock = async (
+    configType: 'collection' | 'hub' | 'preExisting',
+    configId: string,
+    currentLocked: boolean
+  ) => {
+    const isLocked = !currentLocked;
+    try {
+      if (configType === 'collection') {
+        const { data } = await axios.put(
+          `/api/v1/collections/${configId}/lock`,
+          { isLocked }
+        );
+        const updated = data.collectionConfig as CollectionFormConfig;
+        setLocalCollectionConfigs((prev) =>
+          prev.map((c) => (c.id === configId ? { ...c, ...updated } : c))
+        );
+      } else if (configType === 'hub') {
+        const { data } = await axios.put(
+          `/api/v1/defaulthubs/${configId}/lock`,
+          { isLocked }
+        );
+        const updated = data.hubConfig as PlexHubConfig;
+        setLocalHubConfigs((prev) =>
+          prev.map((h) => (h.id === configId ? { ...h, ...updated } : h))
+        );
+      } else {
+        const { data } = await axios.put(
+          `/api/v1/preexisting/${configId}/lock`,
+          { isLocked }
+        );
+        const updated =
+          data.preExistingCollectionConfig as PreExistingCollectionConfig;
+        setLocalPreExistingConfigs((prev) =>
+          prev.map((p) => (p.id === configId ? { ...p, ...updated } : p))
+        );
+      }
+
+      addToast(
+        `Collection ${isLocked ? 'locked' : 'unlocked'} successfully${
+          isLocked
+            ? ' - protected from automatic deletion even if the library becomes inaccessible.'
+            : ''
+        }`,
+        {
+          autoDismiss: true,
+          appearance: 'success',
+        }
+      );
+      revalidateAll();
+    } catch (error) {
+      addToast(
+        `Failed to ${isLocked ? 'lock' : 'unlock'} collection: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
+        {
+          autoDismiss: true,
+          appearance: 'error',
+        }
+      );
     }
   };
 
@@ -2229,6 +2327,7 @@ const CollectionSettings = ({
                   onReorderItems={handleReorderItems}
                   activeTab={activeTab}
                   onBulkEdit={() => setShowBulkEditModal(true)}
+                  onToggleLock={toggleLock}
                 />
               );
             })
@@ -2260,6 +2359,7 @@ const CollectionSettings = ({
               onReorderItems={handleReorderItems}
               activeTab={activeTab}
               onBulkEdit={() => setShowBulkEditModal(true)}
+              onToggleLock={toggleLock}
             />
           ) : (
             <div className="py-8 text-center">

@@ -103,6 +103,52 @@ preExistingRoutes.put('/:id/settings', isAuthenticated(), async (req, res) => {
 });
 
 /**
+ * PUT /api/v1/preexisting/:id/lock
+ * Lock or unlock a pre-existing collection to protect it from automatic deletion.
+ */
+preExistingRoutes.put('/:id/lock', isAuthenticated(), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { isLocked } = req.body as { isLocked?: boolean };
+
+    if (typeof isLocked !== 'boolean') {
+      return res.status(400).json({
+        error: 'Invalid request: isLocked must be a boolean',
+      });
+    }
+
+    const updatedConfig = preExistingCollectionConfigService.updateSettings(
+      id,
+      { isLocked }
+    );
+
+    res.status(200).json({
+      preExistingCollectionConfig: updatedConfig,
+      message: `Pre-existing collection ${
+        isLocked ? 'locked' : 'unlocked'
+      } successfully`,
+    });
+  } catch (error) {
+    logger.error('Failed to update pre-existing collection lock status', {
+      label: 'Pre-existing Collections API',
+      error: error instanceof Error ? error.message : String(error),
+      configId: req.params.id,
+    });
+
+    if (error instanceof Error && error.message === 'Config not found') {
+      return res.status(404).json({
+        error: 'Pre-existing collection not found',
+        message: `Pre-existing collection with id "${req.params.id}" not found`,
+      });
+    }
+
+    res.status(500).json({
+      error: 'Failed to update pre-existing collection lock status',
+    });
+  }
+});
+
+/**
  * POST /api/v1/preexisting/discover
  * Discovery operation for new pre-existing collections
  */

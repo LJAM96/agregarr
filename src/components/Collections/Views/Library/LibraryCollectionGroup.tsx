@@ -3,6 +3,7 @@ import {
   getVisibilityIcons,
   ItemCountBadge,
   LinkIcon as CollectionLinkIcon,
+  LockedIndicator,
   MissingIndicator,
   MissingItemsBadge,
   PlaceholdersBadge,
@@ -41,6 +42,7 @@ import { CSS } from '@dnd-kit/utilities';
 import {
   Bars3Icon,
   LockClosedIcon,
+  LockOpenIcon,
   PencilIcon,
   PencilSquareIcon,
   TrashIcon,
@@ -125,6 +127,11 @@ interface LibraryCollectionGroupProps {
   ) => Promise<void>;
   activeTab: 'home' | 'recommended' | 'library' | 'inactive' | 'unmanaged';
   onBulkEdit?: () => void;
+  onToggleLock?: (
+    configType: 'collection' | 'hub' | 'preExisting',
+    configId: string,
+    currentLocked: boolean
+  ) => Promise<void>;
 }
 
 // SortableItem component for individual collection items - now handles multiple config types
@@ -145,6 +152,11 @@ interface SortableItemProps {
   activeTab: 'home' | 'recommended' | 'library' | 'inactive' | 'unmanaged';
   onIndividualSync?: (collectionId: string) => Promise<void>;
   isSyncing?: boolean;
+  onToggleLock?: (
+    configType: 'collection' | 'hub' | 'preExisting',
+    configId: string,
+    currentLocked: boolean
+  ) => Promise<void>;
 }
 
 const SortableItem = ({
@@ -162,6 +174,7 @@ const SortableItem = ({
   activeTab,
   onIndividualSync,
   isSyncing,
+  onToggleLock,
 }: SortableItemProps) => {
   const intl = useIntl();
   const isHub = configType === 'hub';
@@ -347,6 +360,9 @@ const SortableItem = ({
             {/* Time Restrictions Badge */}
             <TimeRestrictionsBadge timeRestriction={config.timeRestriction} />
 
+            {/* Locked Badge - protected from automatic deletion */}
+            <LockedIndicator isLocked={config.isLocked} />
+
             {/* Custom Sync Schedule Badge (only for Agregarr collections) */}
             {isCollection && (
               <CustomSyncScheduleBadge
@@ -486,16 +502,50 @@ const SortableItem = ({
             </>
           )}
 
+        {onToggleLock && (
+          <Button
+            buttonType="ghost"
+            buttonSize="sm"
+            onClick={() =>
+              onToggleLock(configType, config.id, Boolean(config.isLocked))
+            }
+            className={
+              config.isLocked
+                ? 'text-amber-400 hover:text-amber-300'
+                : 'text-gray-500 hover:text-gray-300'
+            }
+            title={
+              config.isLocked
+                ? 'Locked - protected from automatic deletion. Click to unlock.'
+                : 'Not locked - will be auto-deleted if library becomes inaccessible. Click to lock.'
+            }
+          >
+            {config.isLocked ? (
+              <LockClosedIcon className="h-4 w-4" />
+            ) : (
+              <LockOpenIcon className="h-4 w-4" />
+            )}
+          </Button>
+        )}
+
         {isCollection ? (
           // Full delete for Agregarr collections
-          <ConfirmButton
-            confirmText="Delete"
-            buttonSize="sm"
-            className="text-red-500 hover:bg-red-600 hover:text-white"
-            onClick={() => onDelete(config.id)}
+          <span
+            title={
+              config.isLocked
+                ? 'This collection is locked - delete is blocked. Unlock first.'
+                : undefined
+            }
           >
-            <TrashIcon className="h-4 w-4" />
-          </ConfirmButton>
+            <ConfirmButton
+              confirmText="Delete"
+              buttonSize="sm"
+              className="text-red-500 hover:bg-red-600 hover:text-white"
+              onClick={() => onDelete(config.id)}
+            >
+              <TrashIcon className="h-4 w-4" />
+            </ConfirmButton>
+          </span>
         ) : (
           // Hide button for hubs and pre-existing collections
           activeTab !== 'inactive' && (
@@ -531,6 +581,7 @@ const LibraryCollectionGroup = ({
   onReorderItems,
   activeTab,
   onBulkEdit,
+  onToggleLock,
 }: LibraryCollectionGroupProps) => {
   const intl = useIntl();
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -851,6 +902,7 @@ const LibraryCollectionGroup = ({
                       activeTab={activeTab}
                       onIndividualSync={handleIndividualSync}
                       isSyncing={syncingIds.has(config.id)}
+                      onToggleLock={onToggleLock}
                     />
                   </React.Fragment>
                 );

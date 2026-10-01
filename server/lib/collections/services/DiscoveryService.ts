@@ -1668,6 +1668,18 @@ export class DiscoveryService {
     if (settings.plex.collectionConfigs) {
       settings.plex.collectionConfigs = settings.plex.collectionConfigs.filter(
         (config) => {
+          // Locked collections are never removed, even if their library is inaccessible
+          if (config.isLocked) {
+            logger.info(
+              `Skipping locked collection config during orphaned library cleanup: ${config.name}`,
+              {
+                label: 'Discovery Service - Cleanup',
+                configId: config.id,
+                libraryId: config.libraryId,
+              }
+            );
+            return true;
+          }
           // For configs with array of library IDs, check if any are valid
           if (Array.isArray(config.libraryId)) {
             const validIds = config.libraryId.filter((id) =>
@@ -1724,6 +1736,18 @@ export class DiscoveryService {
     // Clean up hub configs
     if (settings.plex.hubConfigs) {
       settings.plex.hubConfigs = settings.plex.hubConfigs.filter((config) => {
+        // Locked hubs are never removed, even if their library is inaccessible
+        if (config.isLocked) {
+          logger.info(
+            `Skipping locked hub config during orphaned library cleanup: ${config.name}`,
+            {
+              label: 'Discovery Service - Cleanup',
+              configId: config.id,
+              libraryId: config.libraryId,
+            }
+          );
+          return true;
+        }
         if (!validLibraryIds.has(config.libraryId)) {
           orphanedLibraryIds.add(config.libraryId);
           hubsRemoved++;
@@ -1746,6 +1770,18 @@ export class DiscoveryService {
     if (settings.plex.preExistingCollectionConfigs) {
       settings.plex.preExistingCollectionConfigs =
         settings.plex.preExistingCollectionConfigs.filter((config) => {
+          // Locked pre-existing collections are never removed, even if their library is inaccessible
+          if (config.isLocked) {
+            logger.info(
+              `Skipping locked pre-existing collection config during orphaned library cleanup: ${config.name}`,
+              {
+                label: 'Discovery Service - Cleanup',
+                configId: config.id,
+                libraryId: config.libraryId,
+              }
+            );
+            return true;
+          }
           if (!validLibraryIds.has(config.libraryId)) {
             orphanedLibraryIds.add(config.libraryId);
             preExistingRemoved++;
@@ -2313,16 +2349,31 @@ export class DiscoveryService {
         missingPreExistingIds.includes(config.id)
       ) || [];
 
-    if (missingConfigs.length === 0) return;
+    // Locked configs are never auto-cleaned, even when missing
+    const lockedSkipped = missingConfigs.filter((config) => config.isLocked);
+    if (lockedSkipped.length > 0) {
+      logger.info(
+        `Skipping ${lockedSkipped.length} locked missing pre-existing collection(s) during auto cleanup`,
+        {
+          label: 'Discovery Service - Auto Cleanup',
+          configIds: lockedSkipped.map((c) => c.id),
+        }
+      );
+    }
+    const cleanableConfigs = missingConfigs.filter(
+      (config) => !config.isLocked
+    );
+
+    if (cleanableConfigs.length === 0) return;
 
     let hubDeleteCount = 0;
 
     logger.info(
-      `Automatically cleaning up ${missingConfigs.length} missing pre-existing collection(s)`,
+      `Automatically cleaning up ${cleanableConfigs.length} missing pre-existing collection(s)`,
       {
         label: 'Discovery Service - Auto Cleanup',
-        count: missingConfigs.length,
-        configs: missingConfigs.map((c) => ({
+        count: cleanableConfigs.length,
+        configs: cleanableConfigs.map((c) => ({
           id: c.id,
           name: c.name,
           libraryId: c.libraryId,
@@ -2332,7 +2383,7 @@ export class DiscoveryService {
     );
 
     // Delete missing pre-existing collections from Plex hubs
-    for (const config of missingConfigs) {
+    for (const config of cleanableConfigs) {
       if (config.collectionRatingKey && config.libraryId) {
         try {
           // Generate the hub identifier for pre-existing collections
@@ -2364,10 +2415,11 @@ export class DiscoveryService {
       }
     }
 
-    // Remove configs from settings
+    // Remove configs from settings (preserve locked configs)
+    const cleanableIds = new Set(cleanableConfigs.map((c) => c.id));
     settings.plex.preExistingCollectionConfigs =
       settings.plex.preExistingCollectionConfigs?.filter(
-        (config) => !missingPreExistingIds.includes(config.id)
+        (config) => !cleanableIds.has(config.id)
       ) || [];
 
     // Save settings
@@ -2375,13 +2427,13 @@ export class DiscoveryService {
 
     logger.info(
       `Auto cleanup completed: ${
-        missingConfigs.length
+        cleanableConfigs.length
       } pre-existing collection config(s) removed${
         hubDeleteCount > 0 ? `, ${hubDeleteCount} deleted from Plex hubs` : ''
       }`,
       {
         label: 'Discovery Service - Auto Cleanup',
-        configsRemoved: missingConfigs.length,
+        configsRemoved: cleanableConfigs.length,
         hubsDeleted: hubDeleteCount,
       }
     );

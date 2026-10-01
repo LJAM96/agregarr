@@ -59,6 +59,7 @@ export interface PlexHubConfig {
   isActive: boolean; // Whether hub is currently active (computed from time restrictions)
   collectionType: CollectionType;
   missing?: boolean; // True if hub no longer exists in Plex
+  isLocked?: boolean; // If true, protected from automatic deletion even when library is inaccessible
   // Sync status tracking fields
   lastSyncedAt?: string; // ISO string timestamp of last successful sync to Plex
   lastModifiedAt?: string; // ISO string timestamp when config was last modified
@@ -114,6 +115,7 @@ export interface PreExistingCollectionConfig {
   // Simplified categorization system (consistent with PlexHubConfig)
   collectionType: CollectionType;
   missing?: boolean; // True if collection no longer exists in Plex
+  isLocked?: boolean; // If true, protected from automatic deletion even when library is inaccessible
   // Sync status tracking fields
   lastSyncedAt?: string; // ISO string timestamp of last successful sync to Plex
   lastModifiedAt?: string; // ISO string timestamp when config was last modified
@@ -209,6 +211,7 @@ export interface CollectionFormConfig {
   };
   readonly isActive: boolean; // Whether collection is currently active (time restrictions met) - computed by backend
   readonly missing?: boolean; // True if collection no longer exists in Plex
+  readonly isLocked?: boolean; // If true, protected from automatic deletion even when library is inaccessible
   // Sync status tracking fields
   readonly lastSyncedAt?: string; // ISO string timestamp of last successful sync to Plex
   readonly lastModifiedAt?: string; // ISO string timestamp when config was last modified

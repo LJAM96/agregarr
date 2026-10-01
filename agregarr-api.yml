@@ -944,6 +944,11 @@ components:
           type: boolean
           description: 'True if collection no longer exists in Plex'
           example: false
+        isLocked:
+          type: boolean
+          description: 'If true, protected from automatic deletion even when the library becomes inaccessible'
+          example: false
+          nullable: true
         lastSyncedAt:
           type: string
           format: date-time
@@ -2524,6 +2529,11 @@ components:
           type: boolean
           description: 'True if collection no longer exists in Plex'
           example: false
+        isLocked:
+          type: boolean
+          description: 'If true, protected from automatic deletion even when the library becomes inaccessible'
+          example: false
+          nullable: true
         # Multi-source collection properties
         isMultiSource:
           type: boolean
@@ -2989,6 +2999,11 @@ components:
           type: boolean
           description: 'True if hub no longer exists in Plex'
           example: false
+        isLocked:
+          type: boolean
+          description: 'If true, protected from automatic deletion even when the library becomes inaccessible'
+          example: false
+          nullable: true
         lastSyncedAt:
           type: string
           format: date-time
@@ -3108,6 +3123,11 @@ components:
           type: boolean
           description: 'True if hub no longer exists in Plex'
           example: false
+        isLocked:
+          type: boolean
+          description: 'If true, protected from automatic deletion even when the library becomes inaccessible'
+          example: false
+          nullable: true
         timeRestriction:
           type: object
           description: 'Time restriction settings for the hub'
@@ -3407,6 +3427,11 @@ components:
           type: boolean
           description: 'True if collection no longer exists in Plex'
           example: false
+        isLocked:
+          type: boolean
+          description: 'If true, protected from automatic deletion even when the library becomes inaccessible'
+          example: false
+          nullable: true
         lastSyncedAt:
           type: string
           format: date-time
@@ -3664,6 +3689,11 @@ components:
           type: boolean
           description: 'True if collection no longer exists in Plex'
           example: false
+        isLocked:
+          type: boolean
+          description: 'If true, protected from automatic deletion even when the library becomes inaccessible'
+          example: false
+          nullable: true
       required:
         - id
         - collectionRatingKey
@@ -6947,6 +6977,52 @@ paths:
                     example: 'Failed to delete collection'
                   message:
                     type: string
+  /collections/{id}/lock:
+    put:
+      summary: Lock or unlock a collection
+      description: Locks a collection to protect it from automatic deletion (orphaned library cleanup, missing cleanup, inactive removal) even when its library becomes inaccessible. Locked collections require ?force=true for manual deletion.
+      tags:
+        - collections
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Collection ID
+          schema:
+            type: string
+            example: 'collection-123'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - isLocked
+              properties:
+                isLocked:
+                  type: boolean
+                  description: 'True to lock, false to unlock'
+                  example: true
+      responses:
+        '200':
+          description: Collection lock status updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  collectionConfig:
+                    $ref: '#/components/schemas/CollectionConfig'
+                  message:
+                    type: string
+                    example: 'Collection locked successfully'
+        '400':
+          description: Invalid request
+        '404':
+          description: Collection not found
+        '500':
+          description: Failed to update collection lock status
   /collections/{id}/sync:
     post:
       summary: Sync individual collection
@@ -8572,6 +8648,52 @@ paths:
           description: Default hub not found
         '500':
           description: Failed to update default hub settings
+  /defaulthubs/{id}/lock:
+    put:
+      summary: Lock or unlock a default hub
+      description: Locks a hub to protect it from automatic deletion even when its library becomes inaccessible.
+      tags:
+        - default-hubs
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Default hub ID
+          schema:
+            type: string
+            example: '1-movie.recentlyadded'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - isLocked
+              properties:
+                isLocked:
+                  type: boolean
+                  description: 'True to lock, false to unlock'
+                  example: true
+      responses:
+        '200':
+          description: Hub lock status updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  hubConfig:
+                    $ref: '#/components/schemas/PlexHubConfig'
+                  message:
+                    type: string
+                    example: 'Hub locked successfully'
+        '400':
+          description: Invalid request
+        '404':
+          description: Hub not found
+        '500':
+          description: Failed to update hub lock status
   /defaulthubs/discover:
     post:
       summary: Discover new default hubs
@@ -8837,6 +8959,52 @@ paths:
                   error:
                     type: string
                     example: 'Failed to demote pre-existing collection'
+  /preexisting/{id}/lock:
+    put:
+      summary: Lock or unlock a pre-existing collection
+      description: Locks a pre-existing collection to protect it from automatic deletion even when its library becomes inaccessible.
+      tags:
+        - pre-existing-collections
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Pre-existing collection ID
+          schema:
+            type: string
+            example: '1-35954'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - isLocked
+              properties:
+                isLocked:
+                  type: boolean
+                  description: 'True to lock, false to unlock'
+                  example: true
+      responses:
+        '200':
+          description: Pre-existing collection lock status updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  preExistingCollectionConfig:
+                    $ref: '#/components/schemas/PreExistingCollectionConfig'
+                  message:
+                    type: string
+                    example: 'Pre-existing collection locked successfully'
+        '400':
+          description: Invalid request
+        '404':
+          description: Pre-existing collection not found
+        '500':
+          description: Failed to update pre-existing collection lock status
   /preexisting/discover:
     post:
       summary: Discover new pre-existing collections

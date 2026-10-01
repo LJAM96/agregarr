@@ -10,6 +10,7 @@ import {
   ExclamationTriangleIcon,
   LinkIcon as LinkIconHeroicon,
   LinkSlashIcon,
+  LockClosedIcon,
   XMarkIcon,
 } from '@heroicons/react/24/solid';
 import type React from 'react';
@@ -668,6 +669,19 @@ export const MissingIndicator: React.FC<MissingIndicatorProps> = ({
   return (
     <div title={`This ${itemType} no longer exists in Plex`}>
       <ExclamationTriangleIcon className="h-6 w-6 text-red-500" />
+    </div>
+  );
+};
+
+// Locked Indicator - shown when collection is protected from automatic deletion
+export const LockedIndicator: React.FC<{ isLocked?: boolean }> = ({
+  isLocked,
+}) => {
+  if (!isLocked) return null;
+
+  return (
+    <div title="Locked - protected from automatic deletion even if the library becomes inaccessible">
+      <LockClosedIcon className="h-4 w-4 text-amber-400" />
     </div>
   );
 };

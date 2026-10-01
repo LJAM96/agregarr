@@ -3182,6 +3182,17 @@ export abstract class BaseCollectionSync<TSource extends CollectionSource>
     allCollections: PlexCollection[],
     processedCollectionKeys?: Set<string>
   ): Promise<void> {
+    // Locked collections are never removed from Plex, even when inactive
+    if (config.isLocked) {
+      logger.info(
+        `Skipping removal of locked inactive collection: ${config.name}`,
+        {
+          label: `${this.source} Collections`,
+          configId: config.id,
+        }
+      );
+      return;
+    }
     try {
       // Find the collection by stored rating key
       const existingCollections = config.collectionRatingKey

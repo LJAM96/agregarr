@@ -58,6 +58,8 @@ export class DefaultHubConfigService {
           id: existingConfig?.id || IdGenerator.generateId(),
           // Preserve existing isActive status, or default to true for new configs
           isActive: existingConfig?.isActive ?? true,
+          // Preserve existing lock status
+          isLocked: newConfig.isLocked ?? existingConfig?.isLocked ?? false,
           // Note: name comes from newConfig (discovery data), which fixes any broken names from the linking bug
         };
       }
