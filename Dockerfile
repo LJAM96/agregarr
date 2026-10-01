@@ -9,7 +9,7 @@ RUN apk add --no-cache \
   python3 make g++ gcc libc6-compat bash \
   build-base cairo-dev pango-dev jpeg-dev giflib-dev pixman-dev
 
-RUN yarn global add node-gyp
+RUN yarn global add node-gyp@10
 
 COPY package.json yarn.lock ./
 RUN CYPRESS_INSTALL_BINARY=0 yarn install --frozen-lockfile --network-timeout 1000000

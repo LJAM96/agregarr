@@ -2950,6 +2950,20 @@ class PlexAPI {
     const url = `/library/metadata/${ratingKey}?type=1&id=${ratingKey}&editionTitle.value=${encoded}&editionTitle.locked=${locked}`;
     await this.safePutQuery(url);
   }
+
+  /**
+   * Set (lock) the editionTitle field for a TV show (show-level, not episodes).
+   * Plex supports show editions as a whole (type=2). Pass empty string to clear.
+   */
+  public async setShowEditionTitle(
+    ratingKey: string,
+    title: string
+  ): Promise<void> {
+    const locked = title ? 1 : 0;
+    const encoded = encodeURIComponent(title);
+    const url = `/library/metadata/${ratingKey}?type=2&id=${ratingKey}&editionTitle.value=${encoded}&editionTitle.locked=${locked}`;
+    await this.safePutQuery(url);
+  }
 }
 
 export default PlexAPI;

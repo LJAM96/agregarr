@@ -18,6 +18,7 @@ import type {
 import { scheduledJobs } from '@server/job/schedule';
 import type { AvailableCacheIds } from '@server/lib/cache';
 import cacheManager from '@server/lib/cache';
+import editionManager from '@server/lib/editionManager';
 // ImageProxy removed - not needed for collections-only app
 // Plex scanner import removed - not needed for collections-only app
 import type {
@@ -1479,6 +1480,69 @@ settingsRoutes.post('/edition-manager', (req, res) => {
   settings.editionManager = req.body as EditionManagerSettings;
   settings.save();
   return res.status(200).json(settings.editionManager);
+});
+
+settingsRoutes.post('/edition-manager/run', (req, res, next) => {
+  const mode = req.body?.mode;
+  const scope = req.body?.scope ?? 'all';
+
+  if (mode !== 'full' && mode !== 'incremental') {
+    return next({
+      status: 400,
+      message: "Invalid mode. Must be 'full' or 'incremental'.",
+    });
+  }
+
+  if (scope !== 'all' && scope !== 'movies' && scope !== 'shows') {
+    return next({
+      status: 400,
+      message: "Invalid scope. Must be 'all', 'movies' or 'shows'.",
+    });
+  }
+
+  if (editionManager.status.running) {
+    return res.status(409).json({ message: 'Edition Manager already running.' });
+  }
+
+  logger.info(`Edition Manager scoped run requested (mode: ${mode}, scope: ${scope})`, {
+    label: 'Settings',
+  });
+
+  void editionManager
+    .run(mode, scope)
+    .catch((error: unknown) =>
+      logger.error('Scoped Edition Manager run failed', {
+        label: 'Edition Manager',
+        errorMessage: error instanceof Error ? error.message : String(error),
+      })
+    );
+
+  return res.status(202).json({ started: true, mode, scope });
+});
+
+settingsRoutes.post('/edition-manager/tv-preview', async (req, res, next) => {
+  try {
+    const rawLimit = Number(req.body?.limit);
+    const limit = Math.min(
+      Math.max(Number.isFinite(rawLimit) ? Math.floor(rawLimit) : 5, 1),
+      10
+    );
+    const rawTitle = req.body?.title;
+    const title =
+      typeof rawTitle === 'string' && rawTitle.trim() ? rawTitle.trim() : undefined;
+
+    const items = await editionManager.previewTvShows(limit, title);
+    return res.status(200).json({ items });
+  } catch (error) {
+    logger.error('TV preview failed', {
+      label: 'Edition Manager',
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
+    return next({
+      status: 500,
+      message: error instanceof Error ? error.message : 'TV preview failed.',
+    });
+  }
 });
 
 settingsRoutes.post('/export-debug', (req, res, next) => {

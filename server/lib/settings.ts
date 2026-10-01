@@ -684,6 +684,12 @@ export interface EditionManagerSettings {
   languageExcluded: string[];
   /** Skip Language module output when a movie has multiple audio tracks */
   languageSkipMultiple: boolean;
+  /** Enable edition processing for TV shows (show-level, type=2) */
+  tvEnabled?: boolean;
+  /** Ordered list of enabled module names for TV shows (defaults to Resolution + Source) */
+  tvEnabledModules?: string[];
+  /** Separator string for TV show editions */
+  tvSeparator?: string;
 }
 
 export type JobId =
@@ -1133,25 +1139,27 @@ class Settings {
   }
 
   get editionManager(): EditionManagerSettings {
-    return (
-      this.data.editionManager ?? {
-        enabledModules: [
-          'Resolution',
-          'Size',
-          'Source',
-          'Bitrate',
-          'DynamicRange',
-          'Release',
-          'Cut',
-          'AudioCodec',
-        ],
-        separator: ' · ',
-        ratingSource: 'imdb',
-        ratingRottenTomatoesType: 'critic',
-        languageExcluded: ['English'],
-        languageSkipMultiple: false,
-      }
-    );
+    return {
+      enabledModules: [
+        'Resolution',
+        'Size',
+        'Source',
+        'Bitrate',
+        'DynamicRange',
+        'Release',
+        'Cut',
+        'AudioCodec',
+      ],
+      separator: ' · ',
+      ratingSource: 'imdb',
+      ratingRottenTomatoesType: 'critic',
+      languageExcluded: ['English'],
+      languageSkipMultiple: false,
+      tvEnabled: true,
+      tvEnabledModules: ['Resolution', 'Source'],
+      tvSeparator: ' · ',
+      ...(this.data.editionManager ?? {}),
+    };
   }
 
   set editionManager(data: EditionManagerSettings) {

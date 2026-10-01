@@ -4521,6 +4521,20 @@ components:
           type: string
           example: en
           description: ISO 639-1 language code for language-based modules
+        tvEnabled:
+          type: boolean
+          example: true
+          description: Enable show-level editions for TV libraries (type=2)
+        tvEnabledModules:
+          type: array
+          items:
+            type: string
+          example: ['Resolution', 'Source']
+          description: Ordered list of enabled module names for TV shows
+        tvSeparator:
+          type: string
+          example: ' · '
+          description: Separator string for TV show editions
     WatchlistSyncSettings:
       type: object
       properties:
@@ -11045,6 +11059,54 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/EditionManagerSettings'
+  /settings/edition-manager/run:
+    post:
+      summary: Run Edition Manager with scope
+      description: Starts an Edition Manager run in the background for the given mode and scope (all, movies or shows). Returns 409 if a run is already in progress.
+      tags:
+        - settings-services
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - mode
+              properties:
+                mode:
+                  type: string
+                  enum: [full, incremental]
+                scope:
+                  type: string
+                  enum: [all, movies, shows]
+                  default: all
+      responses:
+        '202':
+          description: Edition Manager run started
+        '409':
+          description: Edition Manager already running
+  /settings/edition-manager/tv-preview:
+    post:
+      summary: Preview TV show editions
+      description: Read-only preview that builds (but does not write) show-level editions for a small sample of shows using the saved TV settings.
+      tags:
+        - settings-services
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                limit:
+                  type: number
+                  default: 5
+                title:
+                  type: string
+      responses:
+        '200':
+          description: TV preview results returned
   /settings/public:
     get:
       summary: Get public settings
