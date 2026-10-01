@@ -547,9 +547,9 @@ class EditionManager {
   }
 
   /**
-   * Sample up to 5 episodes across seasons (first episode per season first,
-   * then fill from S01) so technical values are representative without
-   * fetching every episode. Returns full metadata objects for aggregation.
+   * Sample the first episode of each season (up to maxSamples) so each
+   * season gets equal weight. Only single-season shows fill remaining slots
+   * from S01. Returns full metadata objects for aggregation.
    */
   private async getTvEpisodeSamples(
     plexClient: {
@@ -581,18 +581,23 @@ class EditionManager {
       }
     }
 
-    // First episode of each season first (spread across seasons)
+    // First episode of each season only (equal weight per season)
     for (const epKeys of perSeasonFirst) {
       if (epKeys[0] && candidateKeys.length < maxSamples) {
         candidateKeys.push(epKeys[0]);
       }
     }
-    // Fill remaining from season 1 onwards
-    for (const epKeys of perSeasonFirst) {
-      for (let i = 1; i < epKeys.length && candidateKeys.length < maxSamples; i++) {
-        if (!candidateKeys.includes(epKeys[i])) candidateKeys.push(epKeys[i]);
+    // Single-season shows only: fill remaining slots from S01 in order
+    if (perSeasonFirst.length === 1 && candidateKeys.length < maxSamples) {
+      const onlySeason = perSeasonFirst[0];
+      for (
+        let i = 1;
+        i < onlySeason.length && candidateKeys.length < maxSamples;
+        i++
+      ) {
+        if (!candidateKeys.includes(onlySeason[i]))
+          candidateKeys.push(onlySeason[i]);
       }
-      if (candidateKeys.length >= maxSamples) break;
     }
 
     const samples: PlexMovieData[] = [];
